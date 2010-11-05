@@ -71,17 +71,22 @@ function plot() {
     var lineNext = false; 
     for(var i = 0 ; i <= _w ; i++) {
 	var x = i2x(i);
-	var y = evalFunction(x);
-	if(y != undefined) {
-	    var j = y2j(y);
-	    if(lineNext) {
-		_c.lineTo(i, j);
+	try {
+	    var y = evalFunction(x);
+	    if(isFinite(y)) {
+		var j = y2j(y);
+		if(lineNext) {
+		    _c.lineTo(i, j);
+		} else {
+		    _c.moveTo(i, j);
+		    lineNext = true;
+		}
 	    } else {
-		_c.moveTo(i, j);
-		lineNext = true;
+		lineNext = false;
 	    }
-	} else {
-	    lineNext = false;
+	} catch(e) {
+	    console.log("Stopping plot, error with " + evalFunction + " : " + e);
+	    return;
 	}
     }
     _c.stroke();
@@ -90,27 +95,34 @@ function plot() {
 function ftInput() {
     var functionValue = document.getElementById('ft').value;
     if(functionValue == "") return;
-    var x = 0;
-    try {
-	eval(functionValue);
-	window["evalFunction"] = function (x) {
-	    var y = undefined;
-	    try {
-		y = eval(functionValue); 
-	    } catch (e) {
-		console.log(functionValue + " error for x = " + x + " : " + e);
-	    }
-	    return y;
-	};
-	initAxis();
-	plot();
-    } catch (e) {
-	console.log("Invalid input function : " + e);
-    }
+    window["evalFunction"] = function (x) {
+	return eval(functionValue);
+    };
+    initAxis();
+    plot();
+}
+
+function wheelff(event) {
+    wheel(event.detail > 0);
+}
+
+function wheelchrome(event) {
+    wheel(event.wheelDelta > 0);
+}
+
+function wheel(up) {
+    _min = up ? _min / 1.25 : _min * 1.25;
+    _max = up ? _max / 1.25 : _max * 1.25;
+     _s = _scale = _max - _min;
+    _s2 = _s / 2;
+    initAxis();
+    plot();
 }
 
 window.addEventListener('load', function() {
     document.getElementById('ft').addEventListener('input', ftInput, false);
+    document.getElementById('body').addEventListener('mousewheel', wheelchrome, false);
+    document.getElementById('body').addEventListener('DOMMouseScroll', wheelff, false);
     _canvas = document.getElementById("canvas");
     _c = canvas.getContext('2d');
     _h = canvas.height = window.innerHeight - 25;
