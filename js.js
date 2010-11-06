@@ -95,8 +95,8 @@ function plot() {
 		lineNext = false;
 	    }
 	} catch(e) {
-	    console.log("Stopping plot, error with " + evalFunction + " : " + e);
 	    $('#ft').addClass("error");
+	    console.log("Stopping plot, error with " + evalFunction + " : " + e);
 	    return;
 	}
     }
