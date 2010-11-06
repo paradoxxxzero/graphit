@@ -19,22 +19,30 @@
 
 var _canvas, _c, _w, _h, _w2, _h2;
 var _tickSize = 5;
-var _min = -5;
-var _max = 5;
-var _s = _scale = _max - _min;
-var _s2 = _s / 2;
+
+var _xzcoef = 1;
+var _yzcoef = 1;
+
+var _minx = -5;
+var _maxx = 5;
+var _sx = _maxx - _minx;
+var _sx2 = _sx / 2;
+var _miny = -3;
+var _maxy = 3;
+var _sy = _maxy - _miny;
+var _sy2 = _sy / 2;
 
 function i2x(i) {
-    return i * _s / _w - _s2;
+    return i * _sx / _w - _sx2;
 }
 function x2i(x) {
-    return _w2 + x * _w / _s2;
+    return _w2 + x * _w / _sx;
 }
 function j2y(j) {
-    return _h + (j * _s / _h - _s2 / 2);
+    return _h + (j * _sy / _h - _sy2 / 2);
 }
 function y2j(y) {
-    return _h - (_h2 + y * _h / _s);
+    return _h - (_h2 + y * _h / _sy);
 }
 
 function initAxis() { 
@@ -50,13 +58,13 @@ function initAxis() {
 
     _c.beginPath();
     _c.fillStyle = "#448";
-    for(var s = _min ; s <= _max ; s++) {
+    for(var s = _minx ; s <= _maxx ; s++) {
 	var i  = x2i(s);
 	_c.moveTo(i, _h2);
 	_c.lineTo(i, _h2 + _tickSize);
 	_c.fillText(s, i - 3, _h2 + 1.5 * _tickSize + 10);
     }
-    for(var s = _min ; s <= _max ; s++) {
+    for(var s = _miny ; s <= _maxy ; s++) {
 	var j = y2j(s);
 	_c.moveTo(_w2, j);
 	_c.lineTo(_w2 - _tickSize, j);
@@ -92,15 +100,48 @@ function plot() {
     _c.stroke();
 }
 
+function replot() {
+    initAxis();
+    plot();
+}
+
+function size() {
+    _h = _canvas.height = window.innerHeight - 25;
+    _w = _canvas.width = window.innerWidth;
+    _h2 = _h / 2;
+    _w2 = _w / 2;
+}
+
+function resize() {
+    size();
+    replot();
+}
+
 function ftInput() {
     var functionValue = document.getElementById('ft').value;
     if(functionValue == "") return;
     window["evalFunction"] = function (x) {
 	return eval(functionValue);
     };
-    initAxis();
-    plot();
+    replot();
 }
+
+function mdown(event) {
+    
+}
+
+function mmove(event) {
+    
+}
+
+function mup(event) {
+    
+}
+
+
+
+
+
 
 function wheelff(event) {
     wheel(event.detail > 0);
@@ -111,24 +152,28 @@ function wheelchrome(event) {
 }
 
 function wheel(up) {
-    _min = up ? _min / 1.25 : _min * 1.25;
-    _max = up ? _max / 1.25 : _max * 1.25;
-     _s = _scale = _max - _min;
-    _s2 = _s / 2;
-    initAxis();
-    plot();
+    _minx = up ? _minx / 1.25 : _minx * 1.25;
+    _maxx = up ? _maxx / 1.25 : _maxx * 1.25;
+     _sx = _maxx - _minx;
+    _sx2 = _sx / 2;
+    _miny = up ? _miny / 1.25 : _miny * 1.25;
+    _maxy = up ? _maxy / 1.25 : _maxy * 1.25;
+     _sy = _maxy - _miny;
+    _sy2 = _sy / 2;
+    replot();
 }
+
 
 window.addEventListener('load', function() {
     document.getElementById('ft').addEventListener('input', ftInput, false);
+    document.getElementById('body').addEventListener('mousedown', mdown, false);
+    document.getElementById('body').addEventListener('mousemove', mmove, false);
+    document.getElementById('body').addEventListener('mouseup', mup, false);
     document.getElementById('body').addEventListener('mousewheel', wheelchrome, false);
     document.getElementById('body').addEventListener('DOMMouseScroll', wheelff, false);
+    window.addEventListener('resize', resize, false);
     _canvas = document.getElementById("canvas");
-    _c = canvas.getContext('2d');
-    _h = canvas.height = window.innerHeight - 25;
-    _w = canvas.width = window.innerWidth;
-    _h2 = _h / 2;
-    _w2 = _w / 2;
-    initAxis();
+    _c = _canvas.getContext('2d');
+    size();
     ftInput();
 }, false);
