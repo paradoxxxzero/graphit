@@ -17,78 +17,89 @@
   along with this program.  If not, see http://www.gnu.org/licenses/.
 */
 
-var _canvas, _c, _w, _h, _w2, _h2;
-var _tickSize = 5;
+var _canvas, _c, _scr, _mode;
+var _reg = {
+    X: {
+	min: 0,
+	max: 0,
+	zcoef: 0},
+    Y: {
+	min: 0,
+	max: 0,
+	zcoef: 0},
+    tickSize: 5};
+var _dragging = {
+    on: false,
+    x: 0,
+    y: 0};
 
-var _xzcoef = 1;
-var _yzcoef = 1;
+var _Math = {
+    functions: [ "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan" ],
+    constants: ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2"]};
 
-var _minx = -5;
-var _maxx = 5;
-var _sx = _maxx - _minx;
-var _sx2 = _sx / 2;
-var _miny = -3;
-var _maxy = 3;
-var _sy = _maxy - _miny;
-var _sy2 = _sy / 2;
-var _MathFunctions = [ "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan" ];
-
-
-function i2x(i) {
-    return i * _sx / _w - _sx2;
+function x2X(x) {
+    return _reg.X.min + (x * (_reg.X.max - _reg.X.min) / _scr.w);
 }
-function x2i(x) {
-    return _w2 + x * _w / _sx;
+function X2x(X) {
+    return _scr.w * (X - _reg.X.min) / (_reg.X.max - _reg.X.min);
 }
-function j2y(j) {
-    return _h + (j * _sy / _h - _sy2 / 2);
+function dx2DX(dx) {
+    return dx * (_reg.X.max - _reg.X.min) / _scr.w;
 }
-function y2j(y) {
-    return _h - (_h2 + y * _h / _sy);
+function y2Y(y) {
+    return _scr.h + _reg.Y.min + (y * (_reg.Y.max - _reg.Y.min) / _scr.h);
+}
+function Y2y(Y) {
+    return _scr.h - _scr.h * (Y - _reg.Y.min) / (_reg.Y.max - _reg.Y.min);
+}
+function dy2DY(dy) {
+    return dy * (_reg.Y.max - _reg.Y.min) / _scr.h;
 }
 
 function initAxis() { 
     _c.fillStyle = "#222";
     _c.strokeStyle = "#444";
-    _c.fillRect(0, 0, _w, _h);
+    _c.fillRect(0, 0, _scr.w, _scr.h);
     _c.beginPath();
-    _c.moveTo(_w2, 0);
-    _c.lineTo(_w2, _h);
-    _c.moveTo(0, _h2);
-    _c.lineTo(_w, _h2);
+    var yY0 = Y2y(0);
+    var xX0 = X2x(0);
+    _c.moveTo(0, yY0);
+    _c.lineTo(_scr.w, yY0);
+    _c.moveTo(xX0, 0);
+    _c.lineTo(xX0, _scr.h);
     _c.stroke();
-
     _c.beginPath();
     _c.fillStyle = "#448";
-    for(var s = _minx ; s <= _maxx ; s++) {
-	var i  = x2i(s);
-	_c.moveTo(i, _h2);
-	_c.lineTo(i, _h2 + _tickSize);
-	_c.fillText(s, i - 3, _h2 + 1.5 * _tickSize + 10);
+    for(var s = Math.round(_reg.X.min) ; s <= Math.round(_reg.X.max) ; s++) {
+	var x  = X2x(s);
+	_c.moveTo(x, yY0);
+	_c.lineTo(x, yY0 + _reg.tickSize);
+	_c.fillText(s, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
     }
-    for(var s = _miny ; s <= _maxy ; s++) {
-	var j = y2j(s);
-	_c.moveTo(_w2, j);
-	_c.lineTo(_w2 - _tickSize, j);
-	_c.fillText(s, _w2 - 1.5 * _tickSize - 10, j + 3);
+    for(var s = Math.round(_reg.Y.min) ; s <= Math.round(_reg.Y.max) ; s++) {
+	var y = Y2y(s);
+	_c.moveTo(xX0, y);
+	_c.lineTo(xX0 - _reg.tickSize, y);
+	_c.fillText(s, xX0 - 1.5 * _reg.tickSize - 10, y + 3);
     }
     _c.stroke();
     _c.fillStyle = "#222";
     _c.strokeStyle = "#888";
 }
+
 function plot() {
     _c.beginPath();
     var lineNext = false; 
-    for(var i = 0 ; i <= _w ; i++) {
-	var x = i2x(i);
+    for(var x = 0 ; x <= _scr.w ; x++) {
+	var X = x2X(x);
 	try {
-	    var y = evalFunction(x);
-	    if(isFinite(y)) {
-		var j = y2j(y);
+	    var Y = evalFunction(X);
+	    if(isFinite(Y)) {
+		var y = Y2y(Y);
 		if(lineNext) {
-		    _c.lineTo(i, j);
+		    _c.lineTo(x, y);
 		} else {
-		    _c.moveTo(i, j);
+		    _c.moveTo(x, y);
 		    lineNext = true;
 		}
 	    } else {
@@ -110,10 +121,9 @@ function replot() {
 }
 
 function size() {
-    _h = _canvas.height = window.innerHeight - 25;
-    _w = _canvas.width = window.innerWidth;
-    _h2 = _h / 2;
-    _w2 = _w / 2;
+    _scr = {
+	h: _canvas.height = window.innerHeight - 25,
+	w: _canvas.width = window.innerWidth};
 }
 
 function resize() {
@@ -122,8 +132,11 @@ function resize() {
 }
 
 function prepareFunction(ftexp) {
-    for (var m = 0 ; m < _MathFunctions.length ; m++) {
-	ftexp = ftexp.replace(_MathFunctions[m] + "(", "Math." + _MathFunctions[m] + "(");	
+    for (var m = 0 ; m < _Math.functions.length ; m++) {
+	ftexp = ftexp.replace(_Math.functions[m] + "(", "Math." + _Math.functions[m] + "(");
+    }
+    for (var m = 0 ; m < _Math.constants.length ; m++) {
+	ftexp = ftexp.replace("_" + _Math.constants[m], "Math." + _Math.constants[m]);
     }
     return ftexp;
 }
@@ -139,43 +152,83 @@ function ftInput() {
 }
 
 function mdown(event) {
-    
+    _dragging.on = true;
+    _dragging.x = event.clientX;
+    _dragging.y = event.clientY;
 }
 
 function mmove(event) {
+    if(!_dragging.on) return;
+    var d = {
+	x: _dragging.x - event.clientX,
+	y: _dragging.y - event.clientY};
+    _reg.X.min += dx2DX(d.x);
+    _reg.X.max += dx2DX(d.x);
+    _reg.Y.min -= dy2DY(d.y);
+    _reg.Y.max -= dy2DY(d.y);
+    _dragging.x = event.clientX;
+    _dragging.y = event.clientY;
+    replot();
     
 }
 
 function mup(event) {
-    
+    _dragging.on = false;
 }
-
-
-
-
 
 
 function wheelff(event) {
-    wheel(event.detail > 0);
+    wheel(event.detail > 0, {x: event.clientX, y: event.clientY, alt: event.altKey, shft: event.shiftKey});
 }
 
 function wheelchrome(event) {
-    wheel(event.wheelDelta > 0);
+    wheel(event.wheelDelta > 0, {x: event.clientX, y: event.clientY, alt: event.altKey, shft: event.shiftKey});
 }
 
-function wheel(up) {
-    _minx = up ? _minx / 1.25 : _minx * 1.25;
-    _maxx = up ? _maxx / 1.25 : _maxx * 1.25;
-     _sx = _maxx - _minx;
-    _sx2 = _sx / 2;
-    _miny = up ? _miny / 1.25 : _miny * 1.25;
-    _maxy = up ? _maxy / 1.25 : _maxy * 1.25;
-     _sy = _maxy - _miny;
-    _sy2 = _sy / 2;
+function wheel(up, m) {
+    var old = {
+	x: Math.exp(_reg.X.zcoef / 5),
+	y: Math.exp(_reg.Y.zcoef / 5)};
+	
+    if(!up) {
+	if(!m.shft && _mode != 'y') {
+	    _reg.X.zcoef++;
+	}
+	if(!m.alt && _mode != 'x') {
+	    _reg.Y.zcoef++;
+	}
+    } else {
+	if(!m.shft && _mode != 'y') {
+	    _reg.X.zcoef--;
+	}
+	if(!m.alt && _mode != 'x') {
+	    _reg.Y.zcoef--;
+	}
+    }
+    var nw = { 
+	x: Math.exp(_reg.X.zcoef / 5),
+	y: Math.exp(_reg.Y.zcoef / 5)};
+
+    var d = {
+	x: nw.x - old.x,
+	y: nw.y - old.y};
+
+    var p = {
+	x: m.x / _scr.w,
+	y: 1 - m.y / _scr.h};
+
+    _reg.X.min -= 2 * d.x * p.x;
+    _reg.X.max += 2 * d.x * (1 - p.x);
+    _reg.Y.min -= 2 * d.y * p.y;
+    _reg.Y.max += 2 * d.y * (1 - p.y);
     replot();
 }
 
-
+function kdown(event) {
+    if(event.keyCode == 88) _mode = 'x';
+    else if(event.keyCode == 89) _mode = 'y';
+    else _mode = undefined;
+}
 window.addEventListener('load', function() {
     $('#ft')[0].addEventListener('input', ftInput, false);
     var body = $('body')[0];
@@ -184,9 +237,17 @@ window.addEventListener('load', function() {
     body.addEventListener('mouseup', mup, false);
     body.addEventListener('mousewheel', wheelchrome, false);
     body.addEventListener('DOMMouseScroll', wheelff, false);
+    body.addEventListener('keydown', kdown, false);
     window.addEventListener('resize', resize, false);
     _canvas = $('#canvas')[0];
     _c = _canvas.getContext('2d');
     size();
+    var dx = Math.exp(_reg.X.zcoef / 5);
+    var dy = Math.exp(_reg.Y.zcoef / 5);
+    _reg.X.min = -dx;
+    _reg.X.max =  dx;
+    _reg.Y.min = -dy;
+    _reg.Y.max =  dy;
+
     ftInput();
 }, false);
