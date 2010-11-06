@@ -31,6 +31,8 @@ var _miny = -3;
 var _maxy = 3;
 var _sy = _maxy - _miny;
 var _sy2 = _sy / 2;
+var _MathFunctions = [ "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan" ];
+
 
 function i2x(i) {
     return i * _sx / _w - _sx2;
@@ -117,9 +119,17 @@ function resize() {
     replot();
 }
 
+function prepareFunction(ftexp) {
+    for (var m = 0 ; m < _MathFunctions.length ; m++) {
+	ftexp = ftexp.replace(_MathFunctions[m] + "(", "Math." + _MathFunctions[m] + "(");	
+    }
+    return ftexp;
+}
+
 function ftInput() {
     var functionValue = document.getElementById('ft').value;
     if(functionValue == "") return;
+    functionValue = prepareFunction(functionValue);
     window["evalFunction"] = function (x) {
 	return eval(functionValue);
     };
