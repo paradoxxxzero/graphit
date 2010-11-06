@@ -13,6 +13,11 @@ body {
     color: #777;
     width: 75%;
 }
+
+.error {
+    color: #955 !important;
+}
+
 #rft {
     width: 5%;
 }

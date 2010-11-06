@@ -96,9 +96,11 @@ function plot() {
 	    }
 	} catch(e) {
 	    console.log("Stopping plot, error with " + evalFunction + " : " + e);
+	    $('#ft').addClass("error");
 	    return;
 	}
     }
+    $('#ft').removeClass("error");
     _c.stroke();
 }
 
@@ -127,7 +129,7 @@ function prepareFunction(ftexp) {
 }
 
 function ftInput() {
-    var functionValue = document.getElementById('ft').value;
+    var functionValue = $('#ft')[0].value;
     if(functionValue == "") return;
     functionValue = prepareFunction(functionValue);
     window["evalFunction"] = function (x) {
@@ -175,14 +177,15 @@ function wheel(up) {
 
 
 window.addEventListener('load', function() {
-    document.getElementById('ft').addEventListener('input', ftInput, false);
-    document.getElementById('body').addEventListener('mousedown', mdown, false);
-    document.getElementById('body').addEventListener('mousemove', mmove, false);
-    document.getElementById('body').addEventListener('mouseup', mup, false);
-    document.getElementById('body').addEventListener('mousewheel', wheelchrome, false);
-    document.getElementById('body').addEventListener('DOMMouseScroll', wheelff, false);
+    $('#ft')[0].addEventListener('input', ftInput, false);
+    var body = $('body')[0];
+    body.addEventListener('mousedown', mdown, false);
+    body.addEventListener('mousemove', mmove, false);
+    body.addEventListener('mouseup', mup, false);
+    body.addEventListener('mousewheel', wheelchrome, false);
+    body.addEventListener('DOMMouseScroll', wheelff, false);
     window.addEventListener('resize', resize, false);
-    _canvas = document.getElementById("canvas");
+    _canvas = $('#canvas')[0];
     _c = _canvas.getContext('2d');
     size();
     ftInput();
