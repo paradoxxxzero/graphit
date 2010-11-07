@@ -70,18 +70,56 @@ function initAxis() {
     _c.stroke();
     _c.beginPath();
     _c.fillStyle = "#448";
-    for(var s = Math.round(_reg.X.min) ; s <= Math.round(_reg.X.max) ; s++) {
+    var range = {
+	X: _reg.X.max - _reg.X.min,
+	Y: _reg.Y.max - _reg.Y.min};
+    var order = {
+	X: Math.floor(Math.log(range.X)/Math.log(10)),
+	Y: Math.floor(Math.log(range.Y)/Math.log(10))};
+    var ten = {
+	X: Math.pow(10, order.X),
+	Y: Math.pow(10, order.Y)};
+    if(range.X < 2.5 * ten.X) {
+	ten.X /= 4;
+    } else if(range.X < 5 * ten.X) {
+	ten.X /= 2;
+    }
+    if(range.Y < 2.5 * ten.Y) {
+	ten.Y /= 4;
+    } else if(range.Y < 5 * ten.Y) {
+	ten.Y /= 2;
+    }
+    var min = {
+	X: Math.floor(_reg.X.min / ten.X) * ten.X,
+	Y: Math.floor(_reg.Y.min / ten.Y) * ten.Y};
+    var max = {
+	X: Math.floor(_reg.X.max / ten.X) * ten.X,
+	Y: Math.floor(_reg.Y.max / ten.Y) * ten.Y};
+
+    for(var s = min.X  ; s <= max.X ; s += ten.X) {
 	var x  = X2x(s);
 	_c.moveTo(x, yY0);
 	_c.lineTo(x, yY0 + _reg.tickSize);
 	_c.fillText(s, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
     }
-    for(var s = Math.round(_reg.Y.min) ; s <= Math.round(_reg.Y.max) ; s++) {
+    for(var s = min.X + ten.X / 10 ; s < max.X ; s += ten.X / 10) {
+	var x  = X2x(s);
+	_c.moveTo(x, yY0);
+	_c.lineTo(x, yY0 + _reg.tickSize / 2);
+    }
+   
+    for(var s = min.Y ; s <= max.Y ; s += ten.Y) {
 	var y = Y2y(s);
 	_c.moveTo(xX0, y);
 	_c.lineTo(xX0 - _reg.tickSize, y);
-	_c.fillText(s, xX0 - 1.5 * _reg.tickSize - 10, y + 3);
+	_c.fillText(s, xX0 - 1.5 * _reg.tickSize - 5 * new String(s).length, y + 3);
     }
+    for(var s = min.Y + ten.Y / 10 ; s < max.Y ; s += ten.Y / 10) {
+	var y  = Y2y(s);
+	_c.moveTo(xX0, y);
+	_c.lineTo(xX0 - _reg.tickSize / 2, y);
+    }
+
     _c.stroke();
     _c.fillStyle = "#222";
     _c.strokeStyle = "#888";
@@ -133,10 +171,10 @@ function resize() {
 
 function prepareFunction(ftexp) {
     for (var m = 0 ; m < _Math.functions.length ; m++) {
-	ftexp = ftexp.replace(_Math.functions[m] + "(", "Math." + _Math.functions[m] + "(");
+	ftexp = ftexp.replace(new RegExp(_Math.functions[m] + "\\(", "g"), "Math." + _Math.functions[m] + "(");
     }
     for (var m = 0 ; m < _Math.constants.length ; m++) {
-	ftexp = ftexp.replace("_" + _Math.constants[m], "Math." + _Math.constants[m]);
+	ftexp = ftexp.replace(new RegExp("_" + _Math.constants[m], "g"), "Math." + _Math.constants[m]);
     }
     return ftexp;
 }
