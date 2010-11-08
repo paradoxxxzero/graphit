@@ -22,11 +22,11 @@ var _reg = {
     X: {
 	min: 0,
 	max: 0,
-	zcoef: 0},
+	zcoef: 5},
     Y: {
 	min: 0,
 	max: 0,
-	zcoef: 0},
+	zcoef: 5},
     tickSize: 5};
 var _dragging = {
     on: false,
@@ -79,14 +79,22 @@ function initAxis() {
     var ten = {
 	X: Math.pow(10, order.X),
 	Y: Math.pow(10, order.Y)};
+    var fixrange = {
+	X: Math.abs(Math.ceil(Math.log(1 / ten.X) / Math.log(10))),
+	Y: Math.abs(Math.ceil(Math.log(1 / ten.Y) / Math.log(10)))};
+
     if(range.X < 2.5 * ten.X) {
 	ten.X /= 4;
+	fixrange.X += 2;
     } else if(range.X < 5 * ten.X) {
 	ten.X /= 2;
+	fixrange.X++;
     }
     if(range.Y < 2.5 * ten.Y) {
 	ten.Y /= 4;
+	fixrange.Y += 2;
     } else if(range.Y < 5 * ten.Y) {
+	fixrange.Y++;
 	ten.Y /= 2;
     }
     var min = {
@@ -98,10 +106,12 @@ function initAxis() {
 
     for(var s = min.X  ; s <= max.X ; s += ten.X) {
 	var x  = X2x(s);
-	var st = s == 0 ? "0" : s < 1 ? s.toFixed(Math.ceil(Math.log(1 / Math.abs(s - Math.floor(s)))/Math.log(10)) + 1 ) : s;
-	_c.moveTo(x, yY0);
-	_c.lineTo(x, yY0 + _reg.tickSize);
-	_c.fillText(st, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
+	var st = Math.abs(s) < 1 ? s.toFixed(fixrange.X) : s;
+	if(parseFloat(st) != 0) {
+	    _c.moveTo(x, yY0);
+	    _c.lineTo(x, yY0 + _reg.tickSize);
+	    _c.fillText(st, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
+	}
     }
     for(var s = min.X + ten.X / 10 ; s < max.X ; s += ten.X / 10) {
 	var x  = X2x(s);
@@ -111,10 +121,12 @@ function initAxis() {
    
     for(var s = min.Y ; s <= max.Y ; s += ten.Y) {
 	var y = Y2y(s);
-	var st = s == 0 ? "0" : s < 1 ? s.toFixed(Math.ceil(Math.log(1 / Math.abs(s))/Math.log(10))) : s;
-	_c.moveTo(xX0, y);
-	_c.lineTo(xX0 - _reg.tickSize, y);
-	_c.fillText(st, xX0 - 1.5 * _reg.tickSize - 5 * new String(st).length, y + 3);
+	var st = Math.abs(s) < 1 ? s.toFixed(fixrange.Y) : s;
+	if(parseFloat(st) != 0) {
+	    _c.moveTo(xX0, y);
+	    _c.lineTo(xX0 - _reg.tickSize, y);
+	    _c.fillText(st, xX0 - 1.5 * _reg.tickSize - 5 * new String(st).length, y + 3);
+	}
     }
     for(var s = min.Y + ten.Y / 10 ; s < max.Y ; s += ten.Y / 10) {
 	var y  = Y2y(s);
@@ -255,12 +267,12 @@ function wheel(up, m) {
 
     var p = {
 	x: m.x / _scr.w,
-	y: 1 - m.y / _scr.h};
+	y: m.y / _scr.h};
 
     _reg.X.min -= 2 * d.x * p.x;
     _reg.X.max += 2 * d.x * (1 - p.x);
-    _reg.Y.min -= 2 * d.y * p.y;
-    _reg.Y.max += 2 * d.y * (1 - p.y);
+    _reg.Y.min -= 2 * d.y * (1 - p.y);
+    _reg.Y.max += 2 * d.y * p.y;
     replot();
 }
 
