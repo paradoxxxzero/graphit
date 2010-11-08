@@ -98,9 +98,10 @@ function initAxis() {
 
     for(var s = min.X  ; s <= max.X ; s += ten.X) {
 	var x  = X2x(s);
+	var st = s == 0 ? "0" : s < 1 ? s.toFixed(Math.ceil(Math.log(1 / Math.abs(s - Math.floor(s)))/Math.log(10)) + 1 ) : s;
 	_c.moveTo(x, yY0);
 	_c.lineTo(x, yY0 + _reg.tickSize);
-	_c.fillText(s, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
+	_c.fillText(st, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
     }
     for(var s = min.X + ten.X / 10 ; s < max.X ; s += ten.X / 10) {
 	var x  = X2x(s);
@@ -110,9 +111,10 @@ function initAxis() {
    
     for(var s = min.Y ; s <= max.Y ; s += ten.Y) {
 	var y = Y2y(s);
+	var st = s == 0 ? "0" : s < 1 ? s.toFixed(Math.ceil(Math.log(1 / Math.abs(s))/Math.log(10))) : s;
 	_c.moveTo(xX0, y);
 	_c.lineTo(xX0 - _reg.tickSize, y);
-	_c.fillText(s, xX0 - 1.5 * _reg.tickSize - 5 * new String(s).length, y + 3);
+	_c.fillText(st, xX0 - 1.5 * _reg.tickSize - 5 * new String(st).length, y + 3);
     }
     for(var s = min.Y + ten.Y / 10 ; s < max.Y ; s += ten.Y / 10) {
 	var y  = Y2y(s);
