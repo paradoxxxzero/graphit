@@ -106,7 +106,7 @@ function initAxis() {
 
     for(var s = min.X  ; s <= max.X ; s += ten.X) {
 	var x  = X2x(s);
-	var st = Math.abs(s) < 1 ? s.toFixed(fixrange.X) : s;
+	var st = ten.X < 1 ? s.toFixed(fixrange.X) : s;
 	if(parseFloat(st) != 0) {
 	    _c.moveTo(x, yY0);
 	    _c.lineTo(x, yY0 + _reg.tickSize);
@@ -121,7 +121,7 @@ function initAxis() {
    
     for(var s = min.Y ; s <= max.Y ; s += ten.Y) {
 	var y = Y2y(s);
-	var st = Math.abs(s) < 1 ? s.toFixed(fixrange.Y) : s;
+	var st = Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s;
 	if(parseFloat(st) != 0) {
 	    _c.moveTo(xX0, y);
 	    _c.lineTo(xX0 - _reg.tickSize, y);
@@ -230,30 +230,30 @@ function mup(event) {
 
 
 function wheelff(event) {
-    wheel(event.detail > 0, {x: event.clientX, y: event.clientY, alt: event.altKey, shft: event.shiftKey});
+    wheel(event.detail < 0, {x: event.clientX, y: event.clientY, alt: event.altKey, shft: event.shiftKey});
 }
 
 function wheelchrome(event) {
     wheel(event.wheelDelta > 0, {x: event.clientX, y: event.clientY, alt: event.altKey, shft: event.shiftKey});
 }
 
-function wheel(up, m) {
+function wheel(event, delta) {
     var old = {
 	x: Math.exp(_reg.X.zcoef / 5),
 	y: Math.exp(_reg.Y.zcoef / 5)};
 	
-    if(!up) {
-	if(!m.shft && _mode != 'y') {
+    if(delta < 0) {
+	if(!event.shiftKey && _mode != 'y') {
 	    _reg.X.zcoef++;
 	}
-	if(!m.alt && _mode != 'x') {
+	if(!event.altKey && _mode != 'x') {
 	    _reg.Y.zcoef++;
 	}
     } else {
-	if(!m.shft && _mode != 'y') {
+	if(!event.shiftKey && _mode != 'y') {
 	    _reg.X.zcoef--;
 	}
-	if(!m.alt && _mode != 'x') {
+	if(!event.altKey && _mode != 'x') {
 	    _reg.Y.zcoef--;
 	}
     }
@@ -266,8 +266,8 @@ function wheel(up, m) {
 	y: nw.y - old.y};
 
     var p = {
-	x: m.x / _scr.w,
-	y: m.y / _scr.h};
+	x: event.clientX / _scr.w,
+	y: event.clientY / _scr.h};
 
     _reg.X.min -= 2 * d.x * p.x;
     _reg.X.max += 2 * d.x * (1 - p.x);
@@ -281,16 +281,15 @@ function kdown(event) {
     else if(event.keyCode == 89) _mode = 'y';
     else _mode = undefined;
 }
-window.addEventListener('load', function() {
-    $('#ft')[0].addEventListener('input', ftInput, false);
-    var body = $('body')[0];
-    body.addEventListener('mousedown', mdown, false);
-    body.addEventListener('mousemove', mmove, false);
-    body.addEventListener('mouseup', mup, false);
-    body.addEventListener('mousewheel', wheelchrome, false);
-    body.addEventListener('DOMMouseScroll', wheelff, false);
-    body.addEventListener('keydown', kdown, false);
-    window.addEventListener('resize', resize, false);
+$(window).load(function() {
+    $('#ft').bind('input', ftInput);
+    var eventSource = $('canvas');
+    eventSource.mousedown(mdown);
+    eventSource.mousemove(mmove);
+    eventSource.mouseup(mup);
+    eventSource.mousewheel(wheel);
+    eventSource.keydown(kdown);
+    $(window).resize(resize);
     _canvas = $('#canvas')[0];
     _c = _canvas.getContext('2d');
     size();
@@ -300,6 +299,5 @@ window.addEventListener('load', function() {
     _reg.X.max =  dx;
     _reg.Y.min = -dy;
     _reg.Y.max =  dy;
-
     ftInput();
-}, false);
+});
