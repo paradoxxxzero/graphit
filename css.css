@@ -1,26 +1,14 @@
 body {
-    background-color:  #000;
-    color: #555;
     padding: 0;
     margin: 0;
 }
 
 #ft {
-    border: 1px solid #888;
-    background-color: #111;
     height: 21px
     margin: 2px 5px;
-    color: #777;
     width: 75%;
 }
 
-.error {
-    color: #955 !important;
-}
-
-#rft {
-    width: 5%;
-}
 #lft {
     width: 20%;
 }
@@ -30,10 +18,19 @@ body {
     left: 0;
     height: 25px;
     width: 100%;
-    background-color: #222;
-    color: #888;
     font-size: 0.75em;
     text-align: center;
+}
+#watermark {
+   position: absolute;
+   top: 1px;
+   right: 1px;
+   font-size: 0.5em;
+}
+#watermark a {
+  color: #77f;
+  opacity: 0.3;
+  text-decoration: none;
 }
 .moving {
     cursor: move;

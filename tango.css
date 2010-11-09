@@ -1,0 +1,71 @@
+#ft {
+    border: 1px solid #888;
+    background-color: #1b1d1e;
+    color: #a0a0a0;
+}
+.error {
+    color: #955 !important;
+}
+#function {
+    background-color: #1b1d1e;
+    color: #a0a0a0;
+}
+.bg {
+   color: #1b1d1e;
+}
+.axis {
+   color: #5e3fbe;
+}
+.ticknum {
+   color: #5c9dcf;
+}
+.line-color-0 {
+    color: #ff5995;
+}
+.line-color-1 {
+    color: #b6e354;
+}
+.line-color-2 {
+    color: #feed6c;
+}
+.line-color-3 {
+    color: #8cedff;
+}
+.line-color-4 {
+    color: #9e6ffe;
+}
+.line-color-5 {
+    color: #899ca1;
+}
+.line-color-6 {
+    color: #f8f8f2;
+}
+.line-color-7 {
+    color: #505354;
+}
+.line-color-8 {
+    color: #bf4646;
+}
+.line-color-9 {
+    color: #516083;
+}
+.line-color-10 {
+    color: #f92672;
+}
+.line-color-11 {
+    color: #82b414;
+}
+.line-color-12 {
+    color: #fd971f;
+}
+.line-color-13 {
+    color: #56c2d6;
+}
+.line-color-14 {
+    color: #8c54fe;
+}
+.line-color-15 {
+    color: #465457;
+}
+
+

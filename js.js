@@ -20,6 +20,10 @@
 var _canvas, _c, _scr, _mode;
 var _pow = 1.1;
 var _step = 1;
+var _functions = [ ];
+var _selected = 0;
+var _themes = [ "pastel", "white", "tango" ];
+var _theme = 0;
 var _reg = {
     X: {
 	min: 0,
@@ -59,19 +63,25 @@ function dy2DY(dy) {
 }
 
 function initAxis() { 
-    _c.fillStyle = "#222";
-    _c.strokeStyle = "#444";
+    _c.fillStyle = $(".bg").css("color");
+    _c.strokeStyle = $(".axis").css("color");
     _c.fillRect(0, 0, _scr.w, _scr.h);
     _c.beginPath();
     var yY0 = Y2y(0);
     var xX0 = X2x(0);
+    if(xX0 < 0) xX0 = 0;
+    if(xX0 > _scr.w) xX0 = _scr.w;
+    if(yY0 < 0) yY0 = 0;
+    if(yY0 > _scr.h) yY0 = _scr.h;
+    var isRight = xX0 > _scr.w / 2;
+    var isBottom = yY0 > _scr.h / 2;
     _c.moveTo(0, yY0);
     _c.lineTo(_scr.w, yY0);
     _c.moveTo(xX0, 0);
     _c.lineTo(xX0, _scr.h);
     _c.stroke();
     _c.beginPath();
-    _c.fillStyle = "#448";
+    _c.fillStyle = $(".ticknum").css("color");
     var range = {
 	X: _reg.X.max - _reg.X.min,
 	Y: _reg.Y.max - _reg.Y.min};
@@ -110,9 +120,9 @@ function initAxis() {
 	var x  = X2x(s);
 	var st = ten.X < 1 ? s.toFixed(fixrange.X) : s;
 	if(parseFloat(st) != 0) {
-	    _c.moveTo(x, yY0);
-	    _c.lineTo(x, yY0 + _reg.tickSize);
-	    _c.fillText(st, x - 3, yY0 + 1.5 * _reg.tickSize + 10);
+	    _c.moveTo(x, yY0 - (isBottom ? _reg.tickSize : 0));
+	    _c.lineTo(x, yY0 + (isBottom ? 0 : _reg.tickSize));
+	    _c.fillText(st, x - 3, yY0 + (1.5 * _reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
 	}
     }
 
@@ -120,43 +130,46 @@ function initAxis() {
 	var y = Y2y(s);
 	var st = Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s;
 	if(parseFloat(st) != 0) {
-	    _c.moveTo(xX0, y);
-	    _c.lineTo(xX0 - _reg.tickSize, y);
-	    _c.fillText(st, xX0 - 1.5 * _reg.tickSize - 5 * new String(st).length, y + 3);
+	    _c.moveTo(xX0 + (isRight ? 0 : _reg.tickSize), y);
+	    _c.lineTo(xX0 - (isRight ? _reg.tickSize : 0), y);
+	    _c.fillText(st, xX0 + (1.5 * _reg.tickSize + (isRight ? 5 * new String(st).length : 0)) * (isRight ? -1 : 1), y + 3);
 	}
     }
-
     _c.stroke();
-    _c.fillStyle = "#222";
-    _c.strokeStyle = "#888";
+    _c.fillStyle = $(".bg").css("color");
 }
 
 function plot() {
-    _c.beginPath();
-    var lineNext = false; 
-    for(var x = 0 ; x <= _scr.w ; x++) {
-	var X = x2X(x);
-	try {
-	    var Y = evalFunction(X);
-	    if(isFinite(Y)) {
-		var y = Y2y(Y);
-		if(lineNext) {
-		    _c.lineTo(x, y);
+    for(var i = 0 ; i < _functions.length ; i++) {
+	var functionValue = prepareFunction(_functions[i]);
+	var funct = function (x) { return eval(functionValue); };
+	_c.strokeStyle = $(".line-color-" + i).css("color");
+	_c.beginPath();
+	var lineNext = false; 
+	for(var x = 0 ; x <= _scr.w ; x++) {
+	    var X = x2X(x);
+	    try {
+		var Y = funct(X);
+		if(isFinite(Y)) {
+		    var y = Y2y(Y);
+		    if(lineNext) {
+			_c.lineTo(x, y);
+		    } else {
+			_c.moveTo(x, y);
+			lineNext = true;
+		    }
 		} else {
-		    _c.moveTo(x, y);
-		    lineNext = true;
+		    lineNext = false;
 		}
-	    } else {
-		lineNext = false;
+	    } catch(e) {
+		$('#ft').addClass("error");
+		console.log("Stopping plot, error with " + _functions[i] + " : " + e);
+		return;
 	    }
-	} catch(e) {
-	    $('#ft').addClass("error");
-	    console.log("Stopping plot, error with " + evalFunction + " : " + e);
-	    return;
 	}
+	$('#ft').removeClass("error");
+	_c.stroke();
     }
-    $('#ft').removeClass("error");
-    _c.stroke();
 }
 
 function replot() {
@@ -186,12 +199,9 @@ function prepareFunction(ftexp) {
 }
 
 function ftInput() {
-    var functionValue = $('#ft')[0].value;
+    var functionValue = $('#ft').val();
     if(functionValue == "") return;
-    functionValue = prepareFunction(functionValue);
-    window["evalFunction"] = function (x) {
-	return eval(functionValue);
-    };
+    _functions[_selected] = functionValue;
     replot();
     return false;
 }
@@ -275,7 +285,8 @@ function kdown(event) {
     if(event.keyCode == 88) _mode = 'x';
     else if(event.keyCode == 89) _mode = 'y';
     else _mode = undefined;
-    if(event.keyCode == 82) {
+
+    if(event.keyCode == 82) { // r
 	var r = {
 	    X: _reg.X.max - _reg.X.min,
 	    Y: _reg.Y.max - _reg.Y.min};
@@ -284,8 +295,7 @@ function kdown(event) {
 	_reg.Y.min = -r.Y / 2;
 	_reg.Y.max =  r.Y / 2;
 	replot();
-    }
-    if(event.keyCode == 84) {
+    } else if(event.keyCode == 84) { // t
 	_reg.X.zcoef = _reg.Y.zcoef = 1;
 	var nw = { 
 	    x: Math.pow(_pow, _reg.X.zcoef),
@@ -296,12 +306,32 @@ function kdown(event) {
 	_reg.Y.min = -nw.y;
 	_reg.Y.max =  nw.y;
 	replot();
+    } else if(event.keyCode == 83) { // s
+	$("#theme")[0].href = _themes[++_theme % _themes.length] + '.css';
+	setTimeout(replot, 500);
     }
+}
+function ftkdown(event) {
+    $("#nft").removeClass("line-color-" + _selected);
+    if(event.keyCode == 38) { // up
+	if(_selected < 15) {
+	    _selected++;
+	    $("#ft").val(_functions[_selected]);
+	}
+    } else if(event.keyCode == 40) { // down
+	if(_selected > 0) {
+	    _selected--;
+	    $("#ft").val(_functions[_selected]);
+	}
+    }
+    $("#nft").addClass("line-color-" + _selected);
+    $("#nft").text(_selected);
+    event.stopPropagation(); 
 }
 
 $(window).load(function() {
     $('#ft').bind('input', ftInput);
-    $('#ft').keydown(function (e) {e.stopPropagation(); });
+    $('#ft').keydown(ftkdown);
     var eventSource = $('canvas');
     eventSource.mousedown(mdown);
     eventSource.mousemove(mmove);
@@ -316,7 +346,6 @@ $(window).load(function() {
     var nw = { 
 	x: Math.pow(_pow, _reg.X.zcoef),
 	y: Math.pow(_pow, _reg.Y.zcoef)};
-    
     _reg.X.min -= nw.x;
     _reg.X.max += nw.x;
     _reg.Y.min -= nw.y;
