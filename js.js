@@ -338,7 +338,7 @@ $(window).load(function() {
     eventSource.mouseup(mup);
     eventSource.mouseout(mup);
     eventSource.mousewheel(wheel);
-    $("body").keydown(kdown);
+    $(window).keydown(kdown);
     $(window).resize(resize);
     _canvas = $('#canvas')[0];
     _c = _canvas.getContext('2d');
