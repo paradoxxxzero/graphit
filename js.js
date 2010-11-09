@@ -193,6 +193,7 @@ function ftInput() {
 	return eval(functionValue);
     };
     replot();
+    return false;
 }
 
 function mdown(event) {
@@ -201,6 +202,7 @@ function mdown(event) {
     _dragging.y = event.clientY;
     event.stopPropagation();
     $(body).addClass("moving");
+    $('#ft').blur();
     return false;
 }
 
@@ -299,10 +301,12 @@ function kdown(event) {
 
 $(window).load(function() {
     $('#ft').bind('input', ftInput);
+    $('#ft').keydown(function (e) {e.stopPropagation(); });
     var eventSource = $('canvas');
     eventSource.mousedown(mdown);
     eventSource.mousemove(mmove);
     eventSource.mouseup(mup);
+    eventSource.mouseout(mup);
     eventSource.mousewheel(wheel);
     $(body).keydown(kdown);
     $(window).resize(resize);
