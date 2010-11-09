@@ -211,7 +211,7 @@ function mdown(event) {
     _dragging.x = event.clientX;
     _dragging.y = event.clientY;
     event.stopPropagation();
-    $(body).addClass("moving");
+    $("body").addClass("moving");
     $('#ft').blur();
     return false;
 }
@@ -238,7 +238,7 @@ function mmove(event) {
 function mup(event) {
     _dragging.on = false;
     event.stopPropagation();
-    $(body).removeClass("moving");
+    $("body").removeClass("moving");
     return false;
 }
 
@@ -338,7 +338,7 @@ $(window).load(function() {
     eventSource.mouseup(mup);
     eventSource.mouseout(mup);
     eventSource.mousewheel(wheel);
-    $(body).keydown(kdown);
+    $("body").keydown(kdown);
     $(window).resize(resize);
     _canvas = $('#canvas')[0];
     _c = _canvas.getContext('2d');
