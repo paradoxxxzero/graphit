@@ -20,10 +20,13 @@
 var _canvas, _c, _scr, _mode;
 var _pow = 1.1;
 var _step = 1;
-var _functions = [ ];
+var _functions = [ {expr: "sin(pow(x, 4))/x", polar: false} ];
 var _selected = 0;
-var _themes = [ "pastel", "white", "tango" ];
+var _themes = [ "tango", "pastel", "white"];
 var _theme = 0;
+var _polar= { 
+    range: 2,
+    step: 180};
 var _reg = {
     X: {
 	min: 0,
@@ -94,7 +97,6 @@ function initAxis() {
     var fixrange = {
 	X: Math.abs(Math.ceil(Math.log(1 / ten.X) / Math.log(10))),
 	Y: Math.abs(Math.ceil(Math.log(1 / ten.Y) / Math.log(10)))};
-
     if(range.X < 2.5 * ten.X) {
 	ten.X /= 4;
 	fixrange.X += 2;
@@ -115,7 +117,6 @@ function initAxis() {
     var max = {
 	X: Math.floor(_reg.X.max / ten.X) * ten.X,
 	Y: Math.floor(_reg.Y.max / ten.Y) * ten.Y};
-
     for(var s = min.X  ; s <= max.X ; s += ten.X) {
 	var x  = X2x(s);
 	var st = ten.X < 1 ? s.toFixed(fixrange.X) : s;
@@ -125,7 +126,6 @@ function initAxis() {
 	    _c.fillText(st, x - 3, yY0 + (1.5 * _reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
 	}
     }
-
     for(var s = min.Y ; s <= max.Y ; s += ten.Y) {
 	var y = Y2y(s);
 	var st = Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s;
@@ -139,36 +139,70 @@ function initAxis() {
     _c.fillStyle = $(".bg").css("color");
 }
 
+function linearPlot (funct) {
+    var lineNext = false; 
+    for(var x = 0 ; x <= _scr.w ; x++) {
+	var X = x2X(x);
+	try {
+	    var Y = funct(X);
+	    if(isFinite(Y)) {
+		var y = Y2y(Y);
+		if(lineNext) {
+		    _c.lineTo(x, y);
+		} else {
+		    _c.moveTo(x, y);
+		    lineNext = true;
+		}
+	    } else {
+		lineNext = false;
+	    }
+	} catch(e) {
+	    $('#ft').addClass("error");
+	    console.log("Stopping plot, error with " + funct + " : " + e);
+	    return;
+	}
+    }
+}
+
+function polarPlot (funct) {
+    var lineNext = false; 
+    for(var o = 0 ; o <= _polar.range * Math.PI ; o += Math.PI / _polar.step) {
+	try {
+	    var r = funct(o);
+	    if(isFinite(r)) {
+		var X = r * Math.cos(o);
+		var Y = r * Math.sin(o);
+		var x = X2x(X);
+		var y = Y2y(Y);
+		if(lineNext) {
+		    _c.lineTo(x, y);
+		} else {
+		    _c.moveTo(x, y);
+		    lineNext = true;
+		}
+	    } else {
+		lineNext = false;
+	    }
+	} catch(e) {
+	    $('#ft').addClass("error");
+	    console.log("Stopping plot, error with " + funct + " : " + e);
+	    return;
+	}
+    }
+}
+
 function plot() {
     for(var i = 0 ; i < _functions.length ; i++) {
-	var functionValue = prepareFunction(_functions[i]);
-	var funct = function (x) { return eval(functionValue); };
+	var functionValue = prepareFunction(_functions[i].expr);
 	_c.strokeStyle = $(".line-color-" + i).css("color");
 	_c.beginPath();
-	var lineNext = false; 
-	for(var x = 0 ; x <= _scr.w ; x++) {
-	    var X = x2X(x);
-	    try {
-		var Y = funct(X);
-		if(isFinite(Y)) {
-		    var y = Y2y(Y);
-		    if(lineNext) {
-			_c.lineTo(x, y);
-		    } else {
-			_c.moveTo(x, y);
-			lineNext = true;
-		    }
-		} else {
-		    lineNext = false;
-		}
-	    } catch(e) {
-		$('#ft').addClass("error");
-		console.log("Stopping plot, error with " + _functions[i] + " : " + e);
-		return;
-	    }
+	if(_functions[i].polar) {
+	    polarPlot(function (o) { return eval(functionValue); });
+	} else {
+	    linearPlot(function (x) { return eval(functionValue); });
 	}
-	$('#ft').removeClass("error");
 	_c.stroke();
+	$('#ft').removeClass("error");
     }
 }
 
@@ -201,7 +235,7 @@ function prepareFunction(ftexp) {
 function ftInput() {
     var functionValue = $('#ft').val();
     if(functionValue == "") return;
-    _functions[_selected] = functionValue;
+    _functions[_selected].expr = functionValue;
     replot();
     return false;
 }
@@ -257,7 +291,6 @@ function wheel(event, delta) {
 	    _reg.Y.zcoef += _step;
 	    d.y = (Math.pow(_pow, _step) - 1) * Math.pow(_pow, _reg.Y.zcoef - _step); 
 	}
-
     } else { // Zoom in	
 	if(!event.shiftKey && _mode != 'y') {
 	    d.x = (1 - Math.pow(_pow, _step)) * Math.pow(_pow, _reg.X.zcoef - _step);
@@ -271,7 +304,6 @@ function wheel(event, delta) {
     var p = {
 	x: event.clientX / _scr.w,
 	y: event.clientY / _scr.h};
-
     _reg.X.min -= (2 * d.x * event.clientX) / _scr.w;
     _reg.X.max += (2 * d.x * (_scr.w - event.clientX)) / _scr.w;
     _reg.Y.min -= (2 * d.y * (_scr.h - event.clientY)) / _scr.h;
@@ -285,7 +317,6 @@ function kdown(event) {
     if(event.keyCode == 88) _mode = 'x';
     else if(event.keyCode == 89) _mode = 'y';
     else _mode = undefined;
-
     if(event.keyCode == 82) { // r
 	var r = {
 	    X: _reg.X.max - _reg.X.min,
@@ -299,8 +330,7 @@ function kdown(event) {
 	_reg.X.zcoef = _reg.Y.zcoef = 1;
 	var nw = { 
 	    x: Math.pow(_pow, _reg.X.zcoef),
-	    y: Math.pow(_pow, _reg.Y.zcoef)};
-	
+	    y: Math.pow(_pow, _reg.Y.zcoef)};	
 	_reg.X.min = -nw.x;
 	_reg.X.max =  nw.x;
 	_reg.Y.min = -nw.y;
@@ -309,23 +339,46 @@ function kdown(event) {
     } else if(event.keyCode == 83) { // s
 	$("#theme")[0].href = _themes[++_theme % _themes.length] + '.css';
 	setTimeout(replot, 500);
+    } else if (event.keyCode == 77) {
+	_polar.range *= 2;
+	replot();
+    } else if (event.keyCode == 76) {
+	_polar.range /= 2;
+	replot();
+    } else if (event.keyCode == 80) {
+	_polar.step *= 2;
+	replot();
+    } else if (event.keyCode == 79) {
+	_polar.step /= 2;
+	replot();
     }
 }
-function ftkdown(event) {
-    $("#nft").removeClass("line-color-" + _selected);
-    if(event.keyCode == 38) { // up
-	if(_selected < 15) {
-	    _selected++;
-	    $("#ft").val(_functions[_selected]);
-	}
-    } else if(event.keyCode == 40) { // down
-	if(_selected > 0) {
-	    _selected--;
-	    $("#ft").val(_functions[_selected]);
-	}
-    }
+function updateBox() {
+    $("#pft").text(_functions[_selected].polar ? '𝝆' : '𝒇');
     $("#nft").addClass("line-color-" + _selected);
     $("#nft").text(_selected);
+    $("#var").text(_functions[_selected].polar ? 'o' : 'x');
+}
+
+function ftkdown(event) {
+    if(event.keyCode == 38) { // up
+	$("#nft").removeClass("line-color-" + _selected);
+	_selected++;
+	if(_selected > 15) _selected = 0;
+	$("#ft").val(_functions[_selected].expr);	
+    } else if(event.keyCode == 40) { // down
+	$("#nft").removeClass("line-color-" + _selected);
+	_selected--;
+	if(_selected < 0) _selected = 15;
+	$("#ft").val(_functions[_selected].expr);
+    } else if(event.ctrlKey && event.keyCode == 32) { // Ctrl + Space
+	_functions[_selected].polar = !_functions[_selected].polar;
+	replot();
+    } else {
+	event.stopPropagation();
+	return;
+    }
+    updateBox();
     event.stopPropagation(); 
 }
 
@@ -350,5 +403,11 @@ $(window).load(function() {
     _reg.X.max += nw.x;
     _reg.Y.min -= nw.y;
     _reg.Y.max += nw.y;
+    for(var t = 1 ; t < 16 ; t++) {
+	_functions[t] = { expr: '', polar: false};
+    }
+
+    updateBox();
+    $("#ft").val(_functions[0].expr);
     ftInput();
 });
