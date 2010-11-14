@@ -20,7 +20,7 @@
 var _canvas, _c, _scr, _mode;
 var _pow = 1.1;
 var _step = 1;
-var _functions = [ {expr: "sin(pow(x, 4))/x", polar: false} ];
+var _functions = [ {expr: "sin(pow(x, 4))/x", polar: false, error: false} ];
 var _selected = 0;
 var _themes = [ "tango", "pastel", "white"];
 var _theme = 0;
@@ -139,7 +139,7 @@ function initAxis() {
     _c.fillStyle = $(".bg").css("color");
 }
 
-function linearPlot (funct) {
+function linearPlot (funct, i) {
     var lineNext = false; 
     for(var x = 0 ; x <= _scr.w ; x++) {
 	var X = x2X(x);
@@ -157,14 +157,15 @@ function linearPlot (funct) {
 		lineNext = false;
 	    }
 	} catch(e) {
-	    $('#ft').addClass("error");
+	    _functions[i].error = true;
 	    console.log("Stopping plot, error with " + funct + " : " + e);
 	    return;
 	}
+	_functions[i].error = false;
     }
 }
 
-function polarPlot (funct) {
+function polarPlot (funct, i) {
     var lineNext = false; 
     for(var o = 0 ; o <= _polar.range * Math.PI ; o += Math.PI / _polar.step) {
 	try {
@@ -184,25 +185,32 @@ function polarPlot (funct) {
 		lineNext = false;
 	    }
 	} catch(e) {
-	    $('#ft').addClass("error");
+	    _functions[i].error = true;
 	    console.log("Stopping plot, error with " + funct + " : " + e);
 	    return;
 	}
+	_functions[i].error = false;
     }
 }
 
 function plot() {
+    if(_functions[_selected].error) {
+	$('#ft').removeClass("error");	
+    }
     for(var i = 0 ; i < _functions.length ; i++) {
+	if(_functions[i].expr == "") break;
 	var functionValue = prepareFunction(_functions[i].expr);
 	_c.strokeStyle = $(".line-color-" + i).css("color");
 	_c.beginPath();
 	if(_functions[i].polar) {
-	    polarPlot(function (o) { return eval(functionValue); });
+	    polarPlot(function (o) { return eval(functionValue); }, i);
 	} else {
-	    linearPlot(function (x) { return eval(functionValue); });
+	    linearPlot(function (x) { return eval(functionValue); }, i);
 	}
 	_c.stroke();
-	$('#ft').removeClass("error");
+    }
+    if(_functions[_selected].error) {
+	$('#ft').addClass("error");
     }
 }
 
@@ -360,25 +368,31 @@ function updateBox() {
     $("#var").text(_functions[_selected].polar ? 'o' : 'x');
 }
 
+function newSelected() {
+    $("#ft").val(_functions[_selected].expr);	
+    if(_functions[_selected].error) {
+	$('#ft').addClass("error");
+    } else {
+	$('#ft').removeClass("error");
+    }
+    updateBox();
+}
 function ftkdown(event) {
     if(event.keyCode == 38) { // up
 	$("#nft").removeClass("line-color-" + _selected);
 	_selected++;
 	if(_selected > 15) _selected = 0;
-	$("#ft").val(_functions[_selected].expr);	
+	newSelected();
     } else if(event.keyCode == 40) { // down
 	$("#nft").removeClass("line-color-" + _selected);
 	_selected--;
 	if(_selected < 0) _selected = 15;
-	$("#ft").val(_functions[_selected].expr);
+	newSelected();
     } else if(event.ctrlKey && event.keyCode == 32) { // Ctrl + Space
 	_functions[_selected].polar = !_functions[_selected].polar;
+	updateBox();
 	replot();
-    } else {
-	event.stopPropagation();
-	return;
     }
-    updateBox();
     event.stopPropagation(); 
 }
 
