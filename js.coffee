@@ -144,21 +144,15 @@ class GraphIt
 
     plot: ->
         $("#ft").removeClass("error")
-        for f in @functions
+        for f, i in @functions
             break if f.expr is ""
             functionValue = @prepareFunction(f.expr)
             @c.strokeStyle = $(".line-color-" + i).css("color")
             @c.beginPath()
-            if f.polar
-                @polarPlot ((o) ->
-                    x = o
+            plot = if f.polar then @polarPlot else @linearPlot
+            plot.call(this, ((x) ->
                     eval functionValue
-                ), f
-            else
-                @linearPlot ((x) ->
-                    o = x
-                    eval functionValue
-                ), f
+                ), f)
             @c.stroke()
         $("#ft").addClass("error") if @functions[@selected].error
 
@@ -250,18 +244,13 @@ class GraphIt
             false
         ).mousemove((event) =>
             return unless @dragging.on
-            d =
-              x: @dragging.x - event.clientX
-              y: @dragging.y - event.clientY
+            DX = @dx2DX(@dragging.x - event.clientX)
+            DY = @dy2DY(@dragging.y - event.clientY)
 
-            D =
-              X: @dx2DX(d.x)
-              Y: @dy2DY(d.y)
-
-            @reg.X.min += D.X
-            @reg.X.max += D.X
-            @reg.Y.min -= D.Y
-            @reg.Y.max -= D.Y
+            @reg.X.min += DX
+            @reg.X.max += DX
+            @reg.Y.min -= DY
+            @reg.Y.max -= DY
             @dragging.x = event.clientX
             @dragging.y = event.clientY
             event.stopPropagation()

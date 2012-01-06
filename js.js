@@ -171,28 +171,19 @@
     };
 
     GraphIt.prototype.plot = function() {
-      var f, functionValue, _i, _len, _ref;
+      var f, functionValue, i, plot, _len, _ref;
       $("#ft").removeClass("error");
       _ref = this.functions;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        f = _ref[_i];
+      for (i = 0, _len = _ref.length; i < _len; i++) {
+        f = _ref[i];
         if (f.expr === "") break;
         functionValue = this.prepareFunction(f.expr);
         this.c.strokeStyle = $(".line-color-" + i).css("color");
         this.c.beginPath();
-        if (f.polar) {
-          this.polarPlot((function(o) {
-            var x;
-            x = o;
-            return eval(functionValue);
-          }), f);
-        } else {
-          this.linearPlot((function(x) {
-            var o;
-            o = x;
-            return eval(functionValue);
-          }), f);
-        }
+        plot = f.polar ? this.polarPlot : this.linearPlot;
+        plot.call(this, (function(x) {
+          return eval(functionValue);
+        }), f);
         this.c.stroke();
       }
       if (this.functions[this.selected].error) return $("#ft").addClass("error");
@@ -299,20 +290,14 @@
         $("#ft").blur();
         return false;
       }).mousemove(function(event) {
-        var D, d;
+        var DX, DY;
         if (!_this.dragging.on) return;
-        d = {
-          x: _this.dragging.x - event.clientX,
-          y: _this.dragging.y - event.clientY
-        };
-        D = {
-          X: _this.dx2DX(d.x),
-          Y: _this.dy2DY(d.y)
-        };
-        _this.reg.X.min += D.X;
-        _this.reg.X.max += D.X;
-        _this.reg.Y.min -= D.Y;
-        _this.reg.Y.max -= D.Y;
+        DX = _this.dx2DX(_this.dragging.x - event.clientX);
+        DY = _this.dy2DY(_this.dragging.y - event.clientY);
+        _this.reg.X.min += DX;
+        _this.reg.X.max += DX;
+        _this.reg.Y.min -= DY;
+        _this.reg.Y.max -= DY;
         _this.dragging.x = event.clientX;
         _this.dragging.y = event.clientY;
         event.stopPropagation();
