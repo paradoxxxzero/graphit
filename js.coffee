@@ -83,15 +83,10 @@ class GraphIt
         $("#var").text (if @functions[@selected].polar then "o" else "x")
 
     prepareFunction: (ftexp) ->
-        m = 0
-        while m < @Math.functions.length
-            ftexp = ftexp.replace(new RegExp(@Math.functions[m] + "\\(", "g"), "Math." + @Math.functions[m] + "(")
-            m++
-        m = 0
-
-        while m < @Math.constants.length
-            ftexp = ftexp.replace(new RegExp("@" + @Math.constants[m], "g"), "Math." + @Math.constants[m])
-            m++
+        for f in @Math.functions
+            ftexp = ftexp.replace(new RegExp(f + "\\(", "g"), "Math." + f + "(")
+        for c in @Math.constants
+            ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c)
         ftexp
 
     newSelected: ->
@@ -103,11 +98,9 @@ class GraphIt
         @updateBox()
 
 
-    linearPlot: (funct, i) ->
+    linearPlot: (funct, f) ->
         lineNext = false
-        x = 0
-
-        while x <= @scr.w
+        for x in [0..@scr.w]
             X = @x2X(x)
             try
                 Y = funct(X)
@@ -121,17 +114,14 @@ class GraphIt
                 else
                   lineNext = false
             catch e
-                @functions[i].error = true
+                f.error = true
                 console.log "Stopping plot, error with " + funct + " : " + e
                 return
-            x++
-        @functions[i].error = false
+        f.error = false
 
-    polarPlot: (funct, i) ->
+    polarPlot: (funct, f) ->
         lineNext = false
-        o = 0
-
-        while o <= @polar.range * Math.PI
+        for o in [0..@polar.range * Math.PI] by Math.PI / @polar.step
             try
                 r = funct(o)
                 if isFinite(r)
@@ -147,46 +137,40 @@ class GraphIt
                 else
                     lineNext = false
             catch e
-                @functions[i].error = true
+                f.error = true
                 console.log "Stopping plot, error with " + funct + " : " + e
                 return
-            o += Math.PI / @polar.step
-        @functions[i].error = false
+        f.error = false
 
     plot: ->
         $("#ft").removeClass("error")
-        i = 0
-
-        while i < @functions.length
-            break if @functions[i].expr is ""
-            functionValue = @prepareFunction(@functions[i].expr)
+        for f in @functions
+            break if f.expr is ""
+            functionValue = @prepareFunction(f.expr)
             @c.strokeStyle = $(".line-color-" + i).css("color")
             @c.beginPath()
-            if @functions[i].polar
+            if f.polar
                 @polarPlot ((o) ->
+                    x = o
                     eval functionValue
-                ), i
+                ), f
             else
                 @linearPlot ((x) ->
+                    o = x
                     eval functionValue
-                ), i
+                ), f
             @c.stroke()
-            i++
         $("#ft").addClass("error") if @functions[@selected].error
 
     replot: ->
         @c.fillStyle = $(".bg").css("color")
         @c.strokeStyle = $(".axis").css("color")
         @c.fillRect 0, 0, @scr.w, @scr.h
-        @c.beginPath()
-        yY0 = @Y2y(0)
-        xX0 = @X2x(0)
-        xX0 = 0  if xX0 < 0
-        xX0 = @scr.w  if xX0 > @scr.w
-        yY0 = 0  if yY0 < 0
-        yY0 = @scr.h  if yY0 > @scr.h
+        xX0 = Math.min(Math.max(@X2x(0), 0), @scr.w)
+        yY0 = Math.min(Math.max(@Y2y(0), 0), @scr.h)
         isRight = xX0 > @scr.w / 2
         isBottom = yY0 > @scr.h / 2
+        @c.beginPath()
         @c.moveTo 0, yY0
         @c.lineTo @scr.w, yY0
         @c.moveTo xX0, 0
@@ -211,17 +195,17 @@ class GraphIt
             Y: Math.abs(Math.ceil(Math.log(1 / ten.Y) / Math.log(10)))
 
         if range.X < 2.5 * ten.X
-            ten.X /= 4
+            ten.X *= .25
             fixrange.X += 2
         else if range.X < 5 * ten.X
-            ten.X /= 2
+            ten.X *= .5
             fixrange.X++
         if range.Y < 2.5 * ten.Y
-            ten.Y /= 4
+            ten.Y *= .25
             fixrange.Y += 2
         else if range.Y < 5 * ten.Y
             fixrange.Y++
-            ten.Y /= 2
+            ten.Y *= .5
         min =
             X: Math.floor(@reg.X.min / ten.X) * ten.X
             Y: Math.floor(@reg.Y.min / ten.Y) * ten.Y
@@ -230,56 +214,33 @@ class GraphIt
             X: Math.floor(@reg.X.max / ten.X) * ten.X
             Y: Math.floor(@reg.Y.max / ten.Y) * ten.Y
 
-        s = min.X
-
-        while s <= max.X
+        for s in [min.X..max.X] by ten.X
             x = @X2x(s)
             st = (if ten.X < 1 then s.toFixed(fixrange.X) else s)
             unless parseFloat(st) is 0
                 @c.moveTo x, yY0 - (if isBottom then @reg.tickSize else 0)
                 @c.lineTo x, yY0 + (if isBottom then 0 else @reg.tickSize)
                 @c.fillText st, x - 3, yY0 + (1.5 * @reg.tickSize + (if isBottom then 2 else 10)) * (if isBottom then -1 else 1)
-            s += ten.X
-        s = min.Y
-
-        while s <= max.Y
+        for s in [min.Y..max.Y] by ten.X
             y = @Y2y(s)
             st = (if Math.abs(ten.Y) < 1 then s.toFixed(fixrange.Y) else s)
             unless parseFloat(st) is 0
                 @c.moveTo xX0 + (if isRight then 0 else @reg.tickSize), y
                 @c.lineTo xX0 - (if isRight then @reg.tickSize else 0), y
                 @c.fillText st, xX0 + (1.5 * @reg.tickSize + (if isRight then 5 * new String(st).length else 0)) * (if isRight then -1 else 1), y + 3
-            s += ten.Y
         @c.stroke()
         @c.fillStyle = $(".bg").css("color")
         @plot()
 
     constructor: ->
-        ($ft = $("#ft")).bind "input", =>
+        ($ft = $("#ft")).bind("input", =>
             functionValue = $ft.val()
-            return if functionValue is ""
             @functions[@selected].expr = functionValue
             @replot()
-            false
+        ).keydown (e) ->
+            e.stopPropagation() if not ((e.ctrlKey and e.keyCode is 32) or e.keyCode in [33, 34])
 
-        $ft.keydown =>
-            if event.keyCode is 38
-                $("#nft").removeClass "line-color-" + @selected
-                @selected++
-                @selected = 0  if @selected > 15
-                @newSelected()
-            else if event.keyCode is 40
-                $("#nft").removeClass "line-color-" + @selected
-                @selected--
-                @selected = 15  if @selected < 0
-                @newSelected()
-            else if event.ctrlKey and event.keyCode is 32
-                @functions[@selected].polar = not @functions[@selected].polar
-                @updateBox()
-                @replot()
-            event.stopPropagation()
-
-        $("#canvas").mousedown((event) =>
+        ($canvas = $("#canvas")).mousedown((event) =>
             @dragging.on = true
             @dragging.x = event.clientX
             @dragging.y = event.clientY
@@ -314,103 +275,118 @@ class GraphIt
         ).mouseout( ->
             $(@).trigger('mouseup')
         ).mousewheel((event, delta) =>
-            d =
-                x: 0
-                y: 0
-
             if delta < 0
                 if not event.shiftKey and @mode isnt "y"
                     @reg.X.zcoef += @step
-                    d.x = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.X.zcoef - @step)
+                    dx = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.X.zcoef - @step)
                 if not event.altKey and @mode isnt "x"
                     @reg.Y.zcoef += @step
-                    d.y = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.Y.zcoef - @step)
+                    dy = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.Y.zcoef - @step)
             else
                 if not event.shiftKey and @mode isnt "y"
-                    d.x = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.X.zcoef - @step)
+                    dx = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.X.zcoef - @step)
                     @reg.X.zcoef -= @step
                 if not event.altKey and @mode isnt "x"
-                    d.y = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.Y.zcoef - @step)
+                    dy = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.Y.zcoef - @step)
                     @reg.Y.zcoef -= @step
-            p =
-                x: event.clientX / @scr.w
-                y: event.clientY / @scr.h
 
-            @reg.X.min -= (2 * d.x * event.clientX) / @scr.w
-            @reg.X.max += (2 * d.x * (@scr.w - event.clientX)) / @scr.w
-            @reg.Y.min -= (2 * d.y * (@scr.h - event.clientY)) / @scr.h
-            @reg.Y.max += (2 * d.y * event.clientY) / @scr.h
+            @reg.X.min -= (2 * dx * event.clientX) / @scr.w
+            @reg.X.max += (2 * dx * (@scr.w - event.clientX)) / @scr.w
+            @reg.Y.min -= (2 * dy * (@scr.h - event.clientY)) / @scr.h
+            @reg.Y.max += (2 * dy * event.clientY) / @scr.h
             @replot()
             event.stopPropagation()
             false
         )
-        $(window).keydown (event) =>
+        $(window).keydown((event) =>
             if event.keyCode is 88 # x
                 @mode = "x"
             else if event.keyCode is 89 # y
                 @mode = "y"
             else
                 @mode = null
+
             if event.keyCode is 82 # r
-                r =
-                    X: @reg.X.max - @reg.X.min
-                    Y: @reg.Y.max - @reg.Y.min
-
-                @reg.X.min = -r.X / 2
-                @reg.X.max = r.X / 2
-                @reg.Y.min = -r.Y / 2
-                @reg.Y.max = r.Y / 2
-                @replot()
+                rX = @reg.X.max - @reg.X.min
+                rY = @reg.Y.max - @reg.Y.min
+                @reg.X.min = -rX / 2
+                @reg.X.max = rX / 2
+                @reg.Y.min = -rY / 2
+                @reg.Y.max = rY / 2
             else if event.keyCode is 84 # t
-                @reg.X.zcoef = @reg.Y.zcoef = 1
-                nw =
-                    x: Math.pow(@pow, @reg.X.zcoef)
-                    y: Math.pow(@pow, @reg.Y.zcoef)
+                @reg.X.zcoef = @reg.Y.zcoef = 5
+                nwx = Math.pow(@pow, @reg.X.zcoef)
+                nwy = Math.pow(@pow, @reg.Y.zcoef)
 
-                @reg.X.min = -nw.x
-                @reg.X.max = nw.x
-                @reg.Y.min = -nw.y
-                @reg.Y.max = nw.y
-                @replot()
+                @reg.X.min = -nwx
+                @reg.X.max = nwx
+                @reg.Y.min = -nwy
+                @reg.Y.max = nwy
             else if event.keyCode is 83 # s
                 $("#theme")[0].href = @themes[++@theme % @themes.length] + ".css"
-                @replot()
             else if event.keyCode is 77 # m
                 @polar.range *= 2
-                @replot()
             else if event.keyCode is 76 # l
                 @polar.range /= 2
-                @replot()
             else if event.keyCode is 80 # p
                 @polar.step *= 2
-                @replot()
             else if event.keyCode is 79 # o
                 @polar.step /= 2
+            else if event.keyCode is 39 # Right
+                w = @reg.X.max - @reg.X.min
+                @reg.X.min += w / 10
+                @reg.X.max += w / 10
+            else if event.keyCode is 37 # Left
+                w = @reg.X.max - @reg.X.min
+                @reg.X.min -= w / 10
+                @reg.X.max -= w / 10
+            else if event.keyCode is 38 # Up
+                w = @reg.Y.max - @reg.Y.min
+                @reg.Y.min += w / 10
+                @reg.Y.max += w / 10
+            else if event.keyCode is 40 # Down
+                w = @reg.Y.max - @reg.Y.min
+                @reg.Y.min -= w / 10
+                @reg.Y.max -= w / 10
+            else if event.ctrlKey and event.keyCode is 32
+                @functions[@selected].polar = not @functions[@selected].polar
+                @updateBox()
                 @replot()
-
-        $(window).resize =>
+            else if event.keyCode is 33 # PageUp
+                $("#nft").removeClass "line-color-" + @selected
+                @selected++
+                @selected = 0  if @selected > 15
+                @newSelected()
+            else if event.keyCode is 34 # PageUp
+                $("#nft").removeClass "line-color-" + @selected
+                @selected--
+                @selected = 15  if @selected < 0
+                @newSelected()
+            else
+                return
+            @replot()
+        ).resize =>
             @size()
             @replot()
 
-        @canvas = $("#canvas").get(0)
-        @c = @canvas.getContext("2d")
+        @canvas = $canvas.get 0
+        @c = @canvas.getContext "2d"
         @size()
-        nw =
-            x: Math.pow(@pow, @reg.X.zcoef)
-            y: Math.pow(@pow, @reg.Y.zcoef)
+        nwx = Math.pow(@pow, @reg.X.zcoef)
+        nwy = Math.pow(@pow, @reg.Y.zcoef)
 
-        @reg.X.min -= nw.x
-        @reg.X.max += nw.x
-        @reg.Y.min -= nw.y
-        @reg.Y.max += nw.y
-        t = 1
+        @reg.X.min -= nwx
+        @reg.X.max += nwx
+        @reg.Y.min -= nwy
+        @reg.Y.max += nwy
 
-        while t < 16
-            @functions[t] =
+        for n in [1..15]
+            @functions[n] =
                 expr: ""
                 polar: false
-            t++
+                error: false
         @updateBox()
+
         $ft.val @functions[0].expr
         $ft.trigger 'input'
 

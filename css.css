@@ -12,6 +12,9 @@ body {
 #lft {
     width: 20%;
 }
+#pft {
+  font-size: 1.5em;
+}
 #function {
     position: absolute;
     bottom: 0;

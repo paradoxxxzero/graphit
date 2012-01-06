@@ -90,16 +90,16 @@
     };
 
     GraphIt.prototype.prepareFunction = function(ftexp) {
-      var m;
-      m = 0;
-      while (m < this.Math.functions.length) {
-        ftexp = ftexp.replace(new RegExp(this.Math.functions[m] + "\\(", "g"), "Math." + this.Math.functions[m] + "(");
-        m++;
+      var c, f, _i, _j, _len, _len2, _ref, _ref2;
+      _ref = this.Math.functions;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        f = _ref[_i];
+        ftexp = ftexp.replace(new RegExp(f + "\\(", "g"), "Math." + f + "(");
       }
-      m = 0;
-      while (m < this.Math.constants.length) {
-        ftexp = ftexp.replace(new RegExp("@" + this.Math.constants[m], "g"), "Math." + this.Math.constants[m]);
-        m++;
+      _ref2 = this.Math.constants;
+      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+        c = _ref2[_j];
+        ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c);
       }
       return ftexp;
     };
@@ -114,11 +114,10 @@
       return this.updateBox();
     };
 
-    GraphIt.prototype.linearPlot = function(funct, i) {
-      var X, Y, lineNext, x, y;
+    GraphIt.prototype.linearPlot = function(funct, f) {
+      var X, Y, lineNext, x, y, _ref;
       lineNext = false;
-      x = 0;
-      while (x <= this.scr.w) {
+      for (x = 0, _ref = this.scr.w; 0 <= _ref ? x <= _ref : x >= _ref; 0 <= _ref ? x++ : x--) {
         X = this.x2X(x);
         try {
           Y = funct(X);
@@ -134,20 +133,18 @@
             lineNext = false;
           }
         } catch (e) {
-          this.functions[i].error = true;
+          f.error = true;
           console.log("Stopping plot, error with " + funct + " : " + e);
           return;
         }
-        x++;
       }
-      return this.functions[i].error = false;
+      return f.error = false;
     };
 
-    GraphIt.prototype.polarPlot = function(funct, i) {
-      var X, Y, lineNext, o, r, x, y;
+    GraphIt.prototype.polarPlot = function(funct, f) {
+      var X, Y, lineNext, o, r, x, y, _ref, _ref2;
       lineNext = false;
-      o = 0;
-      while (o <= this.polar.range * Math.PI) {
+      for (o = 0, _ref = this.polar.range * Math.PI, _ref2 = Math.PI / this.polar.step; 0 <= _ref ? o <= _ref : o >= _ref; o += _ref2) {
         try {
           r = funct(o);
           if (isFinite(r)) {
@@ -165,53 +162,52 @@
             lineNext = false;
           }
         } catch (e) {
-          this.functions[i].error = true;
+          f.error = true;
           console.log("Stopping plot, error with " + funct + " : " + e);
           return;
         }
-        o += Math.PI / this.polar.step;
       }
-      return this.functions[i].error = false;
+      return f.error = false;
     };
 
     GraphIt.prototype.plot = function() {
-      var functionValue, i;
+      var f, functionValue, _i, _len, _ref;
       $("#ft").removeClass("error");
-      i = 0;
-      while (i < this.functions.length) {
-        if (this.functions[i].expr === "") break;
-        functionValue = this.prepareFunction(this.functions[i].expr);
+      _ref = this.functions;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        f = _ref[_i];
+        if (f.expr === "") break;
+        functionValue = this.prepareFunction(f.expr);
         this.c.strokeStyle = $(".line-color-" + i).css("color");
         this.c.beginPath();
-        if (this.functions[i].polar) {
+        if (f.polar) {
           this.polarPlot((function(o) {
+            var x;
+            x = o;
             return eval(functionValue);
-          }), i);
+          }), f);
         } else {
           this.linearPlot((function(x) {
+            var o;
+            o = x;
             return eval(functionValue);
-          }), i);
+          }), f);
         }
         this.c.stroke();
-        i++;
       }
       if (this.functions[this.selected].error) return $("#ft").addClass("error");
     };
 
     GraphIt.prototype.replot = function() {
-      var fixrange, isBottom, isRight, max, min, order, range, s, st, ten, x, xX0, y, yY0;
+      var fixrange, isBottom, isRight, max, min, order, range, s, st, ten, x, xX0, y, yY0, _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
       this.c.fillStyle = $(".bg").css("color");
       this.c.strokeStyle = $(".axis").css("color");
       this.c.fillRect(0, 0, this.scr.w, this.scr.h);
-      this.c.beginPath();
-      yY0 = this.Y2y(0);
-      xX0 = this.X2x(0);
-      if (xX0 < 0) xX0 = 0;
-      if (xX0 > this.scr.w) xX0 = this.scr.w;
-      if (yY0 < 0) yY0 = 0;
-      if (yY0 > this.scr.h) yY0 = this.scr.h;
+      xX0 = Math.min(Math.max(this.X2x(0), 0), this.scr.w);
+      yY0 = Math.min(Math.max(this.Y2y(0), 0), this.scr.h);
       isRight = xX0 > this.scr.w / 2;
       isBottom = yY0 > this.scr.h / 2;
+      this.c.beginPath();
       this.c.moveTo(0, yY0);
       this.c.lineTo(this.scr.w, yY0);
       this.c.moveTo(xX0, 0);
@@ -236,18 +232,18 @@
         Y: Math.abs(Math.ceil(Math.log(1 / ten.Y) / Math.log(10)))
       };
       if (range.X < 2.5 * ten.X) {
-        ten.X /= 4;
+        ten.X *= .25;
         fixrange.X += 2;
       } else if (range.X < 5 * ten.X) {
-        ten.X /= 2;
+        ten.X *= .5;
         fixrange.X++;
       }
       if (range.Y < 2.5 * ten.Y) {
-        ten.Y /= 4;
+        ten.Y *= .25;
         fixrange.Y += 2;
       } else if (range.Y < 5 * ten.Y) {
         fixrange.Y++;
-        ten.Y /= 2;
+        ten.Y *= .5;
       }
       min = {
         X: Math.floor(this.reg.X.min / ten.X) * ten.X,
@@ -257,8 +253,7 @@
         X: Math.floor(this.reg.X.max / ten.X) * ten.X,
         Y: Math.floor(this.reg.Y.max / ten.Y) * ten.Y
       };
-      s = min.X;
-      while (s <= max.X) {
+      for (s = _ref = min.X, _ref2 = max.X, _ref3 = ten.X; _ref <= _ref2 ? s <= _ref2 : s >= _ref2; s += _ref3) {
         x = this.X2x(s);
         st = (ten.X < 1 ? s.toFixed(fixrange.X) : s);
         if (parseFloat(st) !== 0) {
@@ -266,10 +261,8 @@
           this.c.lineTo(x, yY0 + (isBottom ? 0 : this.reg.tickSize));
           this.c.fillText(st, x - 3, yY0 + (1.5 * this.reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
         }
-        s += ten.X;
       }
-      s = min.Y;
-      while (s <= max.Y) {
+      for (s = _ref4 = min.Y, _ref5 = max.Y, _ref6 = ten.X; _ref4 <= _ref5 ? s <= _ref5 : s >= _ref5; s += _ref6) {
         y = this.Y2y(s);
         st = (Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s);
         if (parseFloat(st) !== 0) {
@@ -277,7 +270,6 @@
           this.c.lineTo(xX0 - (isRight ? this.reg.tickSize : 0), y);
           this.c.fillText(st, xX0 + (1.5 * this.reg.tickSize + (isRight ? 5 * new String(st).length : 0)) * (isRight ? -1 : 1), y + 3);
         }
-        s += ten.Y;
       }
       this.c.stroke();
       this.c.fillStyle = $(".bg").css("color");
@@ -285,35 +277,20 @@
     };
 
     function GraphIt() {
-      var $ft, nw, t;
+      var $canvas, $ft, n, nwx, nwy;
       var _this = this;
       ($ft = $("#ft")).bind("input", function() {
         var functionValue;
         functionValue = $ft.val();
-        if (functionValue === "") return;
         _this.functions[_this.selected].expr = functionValue;
-        _this.replot();
-        return false;
-      });
-      $ft.keydown(function() {
-        if (event.keyCode === 38) {
-          $("#nft").removeClass("line-color-" + _this.selected);
-          _this.selected++;
-          if (_this.selected > 15) _this.selected = 0;
-          _this.newSelected();
-        } else if (event.keyCode === 40) {
-          $("#nft").removeClass("line-color-" + _this.selected);
-          _this.selected--;
-          if (_this.selected < 0) _this.selected = 15;
-          _this.newSelected();
-        } else if (event.ctrlKey && event.keyCode === 32) {
-          _this.functions[_this.selected].polar = !_this.functions[_this.selected].polar;
-          _this.updateBox();
-          _this.replot();
+        return _this.replot();
+      }).keydown(function(e) {
+        var _ref;
+        if (!((e.ctrlKey && e.keyCode === 32) || ((_ref = e.keyCode) === 33 || _ref === 34))) {
+          return e.stopPropagation();
         }
-        return event.stopPropagation();
       });
-      $("#canvas").mousedown(function(event) {
+      ($canvas = $("#canvas")).mousedown(function(event) {
         _this.dragging.on = true;
         _this.dragging.x = event.clientX;
         _this.dragging.y = event.clientY;
@@ -349,44 +326,36 @@
       }).mouseout(function() {
         return $(this).trigger('mouseup');
       }).mousewheel(function(event, delta) {
-        var d, p;
-        d = {
-          x: 0,
-          y: 0
-        };
+        var dx, dy;
         if (delta < 0) {
           if (!event.shiftKey && _this.mode !== "y") {
             _this.reg.X.zcoef += _this.step;
-            d.x = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
+            dx = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
           }
           if (!event.altKey && _this.mode !== "x") {
             _this.reg.Y.zcoef += _this.step;
-            d.y = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
+            dy = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
           }
         } else {
           if (!event.shiftKey && _this.mode !== "y") {
-            d.x = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
+            dx = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
             _this.reg.X.zcoef -= _this.step;
           }
           if (!event.altKey && _this.mode !== "x") {
-            d.y = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
+            dy = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
             _this.reg.Y.zcoef -= _this.step;
           }
         }
-        p = {
-          x: event.clientX / _this.scr.w,
-          y: event.clientY / _this.scr.h
-        };
-        _this.reg.X.min -= (2 * d.x * event.clientX) / _this.scr.w;
-        _this.reg.X.max += (2 * d.x * (_this.scr.w - event.clientX)) / _this.scr.w;
-        _this.reg.Y.min -= (2 * d.y * (_this.scr.h - event.clientY)) / _this.scr.h;
-        _this.reg.Y.max += (2 * d.y * event.clientY) / _this.scr.h;
+        _this.reg.X.min -= (2 * dx * event.clientX) / _this.scr.w;
+        _this.reg.X.max += (2 * dx * (_this.scr.w - event.clientX)) / _this.scr.w;
+        _this.reg.Y.min -= (2 * dy * (_this.scr.h - event.clientY)) / _this.scr.h;
+        _this.reg.Y.max += (2 * dy * event.clientY) / _this.scr.h;
         _this.replot();
         event.stopPropagation();
         return false;
       });
       $(window).keydown(function(event) {
-        var nw, r;
+        var nwx, nwy, rX, rY, w;
         if (event.keyCode === 88) {
           _this.mode = "x";
         } else if (event.keyCode === 89) {
@@ -395,65 +364,83 @@
           _this.mode = null;
         }
         if (event.keyCode === 82) {
-          r = {
-            X: _this.reg.X.max - _this.reg.X.min,
-            Y: _this.reg.Y.max - _this.reg.Y.min
-          };
-          _this.reg.X.min = -r.X / 2;
-          _this.reg.X.max = r.X / 2;
-          _this.reg.Y.min = -r.Y / 2;
-          _this.reg.Y.max = r.Y / 2;
-          return _this.replot();
+          rX = _this.reg.X.max - _this.reg.X.min;
+          rY = _this.reg.Y.max - _this.reg.Y.min;
+          _this.reg.X.min = -rX / 2;
+          _this.reg.X.max = rX / 2;
+          _this.reg.Y.min = -rY / 2;
+          _this.reg.Y.max = rY / 2;
         } else if (event.keyCode === 84) {
-          _this.reg.X.zcoef = _this.reg.Y.zcoef = 1;
-          nw = {
-            x: Math.pow(_this.pow, _this.reg.X.zcoef),
-            y: Math.pow(_this.pow, _this.reg.Y.zcoef)
-          };
-          _this.reg.X.min = -nw.x;
-          _this.reg.X.max = nw.x;
-          _this.reg.Y.min = -nw.y;
-          _this.reg.Y.max = nw.y;
-          return _this.replot();
+          _this.reg.X.zcoef = _this.reg.Y.zcoef = 5;
+          nwx = Math.pow(_this.pow, _this.reg.X.zcoef);
+          nwy = Math.pow(_this.pow, _this.reg.Y.zcoef);
+          _this.reg.X.min = -nwx;
+          _this.reg.X.max = nwx;
+          _this.reg.Y.min = -nwy;
+          _this.reg.Y.max = nwy;
         } else if (event.keyCode === 83) {
           $("#theme")[0].href = _this.themes[++_this.theme % _this.themes.length] + ".css";
-          return _this.replot();
         } else if (event.keyCode === 77) {
           _this.polar.range *= 2;
-          return _this.replot();
         } else if (event.keyCode === 76) {
           _this.polar.range /= 2;
-          return _this.replot();
         } else if (event.keyCode === 80) {
           _this.polar.step *= 2;
-          return _this.replot();
         } else if (event.keyCode === 79) {
           _this.polar.step /= 2;
-          return _this.replot();
+        } else if (event.keyCode === 39) {
+          w = _this.reg.X.max - _this.reg.X.min;
+          _this.reg.X.min += w / 10;
+          _this.reg.X.max += w / 10;
+        } else if (event.keyCode === 37) {
+          w = _this.reg.X.max - _this.reg.X.min;
+          _this.reg.X.min -= w / 10;
+          _this.reg.X.max -= w / 10;
+        } else if (event.keyCode === 38) {
+          w = _this.reg.Y.max - _this.reg.Y.min;
+          _this.reg.Y.min += w / 10;
+          _this.reg.Y.max += w / 10;
+        } else if (event.keyCode === 40) {
+          w = _this.reg.Y.max - _this.reg.Y.min;
+          _this.reg.Y.min -= w / 10;
+          _this.reg.Y.max -= w / 10;
+        } else if (event.ctrlKey && event.keyCode === 32) {
+          _this.functions[_this.selected].polar = !_this.functions[_this.selected].polar;
+          _this.updateBox();
+          _this.replot();
+        } else if (event.keyCode === 33) {
+          $("#nft").removeClass("line-color-" + _this.selected);
+          _this.selected++;
+          if (_this.selected > 15) _this.selected = 0;
+          _this.newSelected();
+        } else if (event.keyCode === 34) {
+          $("#nft").removeClass("line-color-" + _this.selected);
+          _this.selected--;
+          if (_this.selected < 0) _this.selected = 15;
+          _this.newSelected();
+        } else {
+          return;
         }
-      });
-      $(window).resize(function() {
+        return _this.replot();
+      }).resize(function() {
         _this.size();
         return _this.replot();
       });
-      this.canvas = $("#canvas").get(0);
+      this.canvas = $canvas.get(0);
       this.c = this.canvas.getContext("2d");
       this.size();
-      nw = {
-        x: Math.pow(this.pow, this.reg.X.zcoef),
-        y: Math.pow(this.pow, this.reg.Y.zcoef)
-      };
-      this.reg.X.min -= nw.x;
-      this.reg.X.max += nw.x;
-      this.reg.Y.min -= nw.y;
-      this.reg.Y.max += nw.y;
-      t = 1;
-      while (t < 16) {
-        this.functions[t] = {
+      nwx = Math.pow(this.pow, this.reg.X.zcoef);
+      nwy = Math.pow(this.pow, this.reg.Y.zcoef);
+      this.reg.X.min -= nwx;
+      this.reg.X.max += nwx;
+      this.reg.Y.min -= nwy;
+      this.reg.Y.max += nwy;
+      for (n = 1; n <= 15; n++) {
+        this.functions[n] = {
           expr: "",
-          polar: false
+          polar: false,
+          error: false
         };
-        t++;
       }
       this.updateBox();
       $ft.val(this.functions[0].expr);
