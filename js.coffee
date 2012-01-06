@@ -344,14 +344,14 @@ class GraphIt
             event.stopPropagation()
             false
         )
-        $(@).keydown (event) =>
-            if event.keyCode is 88
+        $(window).keydown (event) =>
+            if event.keyCode is 88 # x
                 @mode = "x"
-            else if event.keyCode is 89
+            else if event.keyCode is 89 # y
                 @mode = "y"
             else
-                @mode = `undefined`
-            if event.keyCode is 82
+                @mode = null
+            if event.keyCode is 82 # r
                 r =
                     X: @reg.X.max - @reg.X.min
                     Y: @reg.Y.max - @reg.Y.min
@@ -360,8 +360,8 @@ class GraphIt
                 @reg.X.max = r.X / 2
                 @reg.Y.min = -r.Y / 2
                 @reg.Y.max = r.Y / 2
-                replot()
-            else if event.keyCode is 84
+                @replot()
+            else if event.keyCode is 84 # t
                 @reg.X.zcoef = @reg.Y.zcoef = 1
                 nw =
                     x: Math.pow(@pow, @reg.X.zcoef)
@@ -371,20 +371,20 @@ class GraphIt
                 @reg.X.max = nw.x
                 @reg.Y.min = -nw.y
                 @reg.Y.max = nw.y
-                replot()
-            else if event.keyCode is 83
+                @replot()
+            else if event.keyCode is 83 # s
                 $("#theme")[0].href = @themes[++@theme % @themes.length] + ".css"
-                setTimeout replot, 500
-            else if event.keyCode is 77
+                @replot()
+            else if event.keyCode is 77 # m
                 @polar.range *= 2
                 @replot()
-            else if event.keyCode is 76
+            else if event.keyCode is 76 # l
                 @polar.range /= 2
                 @replot()
-            else if event.keyCode is 80
+            else if event.keyCode is 80 # p
                 @polar.step *= 2
                 @replot()
-            else if event.keyCode is 79
+            else if event.keyCode is 79 # o
                 @polar.step /= 2
                 @replot()
 

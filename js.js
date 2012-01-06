@@ -385,14 +385,14 @@
         event.stopPropagation();
         return false;
       });
-      $(this).keydown(function(event) {
+      $(window).keydown(function(event) {
         var nw, r;
         if (event.keyCode === 88) {
           _this.mode = "x";
         } else if (event.keyCode === 89) {
           _this.mode = "y";
         } else {
-          _this.mode = undefined;
+          _this.mode = null;
         }
         if (event.keyCode === 82) {
           r = {
@@ -403,7 +403,7 @@
           _this.reg.X.max = r.X / 2;
           _this.reg.Y.min = -r.Y / 2;
           _this.reg.Y.max = r.Y / 2;
-          return replot();
+          return _this.replot();
         } else if (event.keyCode === 84) {
           _this.reg.X.zcoef = _this.reg.Y.zcoef = 1;
           nw = {
@@ -414,10 +414,10 @@
           _this.reg.X.max = nw.x;
           _this.reg.Y.min = -nw.y;
           _this.reg.Y.max = nw.y;
-          return replot();
+          return _this.replot();
         } else if (event.keyCode === 83) {
           $("#theme")[0].href = _this.themes[++_this.theme % _this.themes.length] + ".css";
-          return setTimeout(replot, 500);
+          return _this.replot();
         } else if (event.keyCode === 77) {
           _this.polar.range *= 2;
           return _this.replot();
