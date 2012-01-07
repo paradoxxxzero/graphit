@@ -21,28 +21,24 @@ class GraphIt
     step: 1
     functions: [
        expr: "sin(pow(x, 4))/x"
-       polar: false
+       type: 'linear'
        error: false
     ]
     selected: 0
     themes: [ "tango", "pastel", "white" ]
     theme: 0
-    polar:
-       range: 2
-       step: 180
-
+    polar_range: 2
+    polar_step: 180
     reg:
-       X:
-           min: 0
-           max: 0
-           zcoef: 5
-
-       Y:
-           min: 0
-           max: 0
-           zcoef: 5
-
-       tickSize: 5
+        X:
+            min: 0
+            max: 0
+            zcoef: 5
+        Y:
+            min: 0
+            max: 0
+            zcoef: 5
+        tickSize: 5
 
     dragging:
         on: false
@@ -68,7 +64,7 @@ class GraphIt
         dx * (@reg.X.max - @reg.X.min) / @scr.w
 
     y2Y: (y) ->
-        @scr.h + @reg.Y.min + (y * (@reg.Y.max - @reg.Y.min) / @scr.h)
+        @reg.Y.min + ((@scr.h - y) * (@reg.Y.max - @reg.Y.min) / @scr.h)
 
     Y2y: (Y) ->
         @scr.h - @scr.h * (Y - @reg.Y.min) / (@reg.Y.max - @reg.Y.min)
@@ -77,10 +73,10 @@ class GraphIt
         dy * (@reg.Y.max - @reg.Y.min) / @scr.h
 
     updateBox: ->
-        $("#pft").html (if @functions[@selected].polar then "&#x1D746;" else "&#x1D487;")
+        $("#pft").html(if @functions[@selected].type is 'polar' then "&#x1D746;" else "&#x1D487;")
         $("#nft").addClass "line-color-" + @selected
         $("#nft").text @selected
-        $("#var").text (if @functions[@selected].polar then "o" else "x")
+        # $("#var").text(if @functions[@selected].type is 'horizontal'  then "y" else "x")
 
     prepareFunction: (ftexp) ->
         for f in @Math.functions
@@ -97,8 +93,7 @@ class GraphIt
             $("#ft").removeClass "error"
         @updateBox()
 
-
-    linearPlot: (funct, f) ->
+    linear: (funct, f) ->
         lineNext = false
         for x in [0..@scr.w]
             X = @x2X(x)
@@ -119,9 +114,30 @@ class GraphIt
                 return
         f.error = false
 
-    polarPlot: (funct, f) ->
+    horizontal: (funct, f) ->
         lineNext = false
-        for o in [0..@polar.range * Math.PI] by Math.PI / @polar.step
+        for y in [0..@scr.h]
+            Y = @y2Y(y)
+            try
+                X = funct(Y)
+                if isFinite(X)
+                    x = @X2x(X)
+                    if lineNext
+                        @c.lineTo x, y
+                    else
+                        @c.moveTo x, y
+                        lineNext = true
+                else
+                  lineNext = false
+            catch e
+                f.error = true
+                console.log "Stopping plot, error with " + funct + " : " + e
+                return
+        f.error = false
+
+    polar: (funct, f) ->
+        lineNext = false
+        for o in [0..@polar_range * Math.PI] by Math.PI / @polar_step
             try
                 r = funct(o)
                 if isFinite(r)
@@ -144,16 +160,15 @@ class GraphIt
 
     plot: ->
         $("#ft").removeClass("error")
+        time = new Date().getTime()
         for f, i in @functions
             break if f.expr is ""
             functionValue = @prepareFunction(f.expr)
             @c.strokeStyle = $(".line-color-" + i).css("color")
             @c.beginPath()
-            plot = if f.polar then @polarPlot else @linearPlot
-            plot.call(this, ((x) ->
-                    eval functionValue
-                ), f)
+            @[f.type](((x) -> eval functionValue), f)
             @c.stroke()
+        document.title = new Date().getTime() - time
         $("#ft").addClass("error") if @functions[@selected].error
 
     replot: ->
@@ -314,13 +329,13 @@ class GraphIt
             else if event.keyCode is 83 # s
                 $("#theme")[0].href = @themes[++@theme % @themes.length] + ".css"
             else if event.keyCode is 77 # m
-                @polar.range *= 2
+                @polar_range *= 2
             else if event.keyCode is 76 # l
-                @polar.range /= 2
+                @polar_range /= 2
             else if event.keyCode is 80 # p
-                @polar.step *= 2
+                @polar_step *= 2
             else if event.keyCode is 79 # o
-                @polar.step /= 2
+                @polar_step /= 2
             else if event.keyCode is 39 # Right
                 w = @reg.X.max - @reg.X.min
                 @reg.X.min += w / 10
@@ -338,7 +353,12 @@ class GraphIt
                 @reg.Y.min -= w / 10
                 @reg.Y.max -= w / 10
             else if event.ctrlKey and event.keyCode is 32
-                @functions[@selected].polar = not @functions[@selected].polar
+                if @functions[@selected].type == 'linear'
+                    @functions[@selected].type = 'polar'
+                else if @functions[@selected].type == 'polar'
+                    @functions[@selected].type = 'horizontal'
+                else if @functions[@selected].type == 'horizontal'
+                    @functions[@selected].type = 'linear'
                 @updateBox()
                 @replot()
             else if event.keyCode is 33 # PageUp
@@ -372,7 +392,7 @@ class GraphIt
         for n in [1..15]
             @functions[n] =
                 expr: ""
-                polar: false
+                type: 'linear'
                 error: false
         @updateBox()
 

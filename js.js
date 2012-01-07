@@ -3,6 +3,8 @@
 
   GraphIt = (function() {
 
+    GraphIt.name = 'GraphIt';
+
     GraphIt.prototype.pow = 1.1;
 
     GraphIt.prototype.step = 1;
@@ -10,7 +12,7 @@
     GraphIt.prototype.functions = [
       {
         expr: "sin(pow(x, 4))/x",
-        polar: false,
+        type: 'linear',
         error: false
       }
     ];
@@ -21,10 +23,9 @@
 
     GraphIt.prototype.theme = 0;
 
-    GraphIt.prototype.polar = {
-      range: 2,
-      step: 180
-    };
+    GraphIt.prototype.polar_range = 2;
+
+    GraphIt.prototype.polar_step = 180;
 
     GraphIt.prototype.reg = {
       X: {
@@ -71,7 +72,7 @@
     };
 
     GraphIt.prototype.y2Y = function(y) {
-      return this.scr.h + this.reg.Y.min + (y * (this.reg.Y.max - this.reg.Y.min) / this.scr.h);
+      return this.reg.Y.min + ((this.scr.h - y) * (this.reg.Y.max - this.reg.Y.min) / this.scr.h);
     };
 
     GraphIt.prototype.Y2y = function(Y) {
@@ -83,10 +84,9 @@
     };
 
     GraphIt.prototype.updateBox = function() {
-      $("#pft").html((this.functions[this.selected].polar ? "&#x1D746;" : "&#x1D487;"));
+      $("#pft").html(this.functions[this.selected].type === 'polar' ? "&#x1D746;" : "&#x1D487;");
       $("#nft").addClass("line-color-" + this.selected);
-      $("#nft").text(this.selected);
-      return $("#var").text((this.functions[this.selected].polar ? "o" : "x"));
+      return $("#nft").text(this.selected);
     };
 
     GraphIt.prototype.prepareFunction = function(ftexp) {
@@ -114,10 +114,10 @@
       return this.updateBox();
     };
 
-    GraphIt.prototype.linearPlot = function(funct, f) {
-      var X, Y, lineNext, x, y, _ref;
+    GraphIt.prototype.linear = function(funct, f) {
+      var X, Y, lineNext, x, y, _i, _ref;
       lineNext = false;
-      for (x = 0, _ref = this.scr.w; 0 <= _ref ? x <= _ref : x >= _ref; 0 <= _ref ? x++ : x--) {
+      for (x = _i = 0, _ref = this.scr.w; 0 <= _ref ? _i <= _ref : _i >= _ref; x = 0 <= _ref ? ++_i : --_i) {
         X = this.x2X(x);
         try {
           Y = funct(X);
@@ -141,10 +141,37 @@
       return f.error = false;
     };
 
-    GraphIt.prototype.polarPlot = function(funct, f) {
-      var X, Y, lineNext, o, r, x, y, _ref, _ref2;
+    GraphIt.prototype.horizontal = function(funct, f) {
+      var X, Y, lineNext, x, y, _i, _ref;
       lineNext = false;
-      for (o = 0, _ref = this.polar.range * Math.PI, _ref2 = Math.PI / this.polar.step; 0 <= _ref ? o <= _ref : o >= _ref; o += _ref2) {
+      for (y = _i = 0, _ref = this.scr.h; 0 <= _ref ? _i <= _ref : _i >= _ref; y = 0 <= _ref ? ++_i : --_i) {
+        Y = this.y2Y(y);
+        try {
+          X = funct(Y);
+          if (isFinite(X)) {
+            x = this.X2x(X);
+            if (lineNext) {
+              this.c.lineTo(x, y);
+            } else {
+              this.c.moveTo(x, y);
+              lineNext = true;
+            }
+          } else {
+            lineNext = false;
+          }
+        } catch (e) {
+          f.error = true;
+          console.log("Stopping plot, error with " + funct + " : " + e);
+          return;
+        }
+      }
+      return f.error = false;
+    };
+
+    GraphIt.prototype.polar = function(funct, f) {
+      var X, Y, lineNext, o, r, x, y, _i, _ref, _ref2;
+      lineNext = false;
+      for (o = _i = 0, _ref = this.polar_range * Math.PI, _ref2 = Math.PI / this.polar_step; 0 <= _ref ? _i <= _ref : _i >= _ref; o = _i += _ref2) {
         try {
           r = funct(o);
           if (isFinite(r)) {
@@ -171,26 +198,27 @@
     };
 
     GraphIt.prototype.plot = function() {
-      var f, functionValue, i, plot, _len, _ref;
+      var f, functionValue, i, time, _i, _len, _ref;
       $("#ft").removeClass("error");
+      time = new Date().getTime();
       _ref = this.functions;
-      for (i = 0, _len = _ref.length; i < _len; i++) {
+      for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
         f = _ref[i];
         if (f.expr === "") break;
         functionValue = this.prepareFunction(f.expr);
         this.c.strokeStyle = $(".line-color-" + i).css("color");
         this.c.beginPath();
-        plot = f.polar ? this.polarPlot : this.linearPlot;
-        plot.call(this, (function(x) {
+        this[f.type]((function(x) {
           return eval(functionValue);
         }), f);
         this.c.stroke();
       }
+      document.title = new Date().getTime() - time;
       if (this.functions[this.selected].error) return $("#ft").addClass("error");
     };
 
     GraphIt.prototype.replot = function() {
-      var fixrange, isBottom, isRight, max, min, order, range, s, st, ten, x, xX0, y, yY0, _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
+      var fixrange, isBottom, isRight, max, min, order, range, s, st, ten, x, xX0, y, yY0, _i, _j, _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
       this.c.fillStyle = $(".bg").css("color");
       this.c.strokeStyle = $(".axis").css("color");
       this.c.fillRect(0, 0, this.scr.w, this.scr.h);
@@ -244,7 +272,7 @@
         X: Math.floor(this.reg.X.max / ten.X) * ten.X,
         Y: Math.floor(this.reg.Y.max / ten.Y) * ten.Y
       };
-      for (s = _ref = min.X, _ref2 = max.X, _ref3 = ten.X; _ref <= _ref2 ? s <= _ref2 : s >= _ref2; s += _ref3) {
+      for (s = _i = _ref = min.X, _ref2 = max.X, _ref3 = ten.X; _ref <= _ref2 ? _i <= _ref2 : _i >= _ref2; s = _i += _ref3) {
         x = this.X2x(s);
         st = (ten.X < 1 ? s.toFixed(fixrange.X) : s);
         if (parseFloat(st) !== 0) {
@@ -253,7 +281,7 @@
           this.c.fillText(st, x - 3, yY0 + (1.5 * this.reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
         }
       }
-      for (s = _ref4 = min.Y, _ref5 = max.Y, _ref6 = ten.X; _ref4 <= _ref5 ? s <= _ref5 : s >= _ref5; s += _ref6) {
+      for (s = _j = _ref4 = min.Y, _ref5 = max.Y, _ref6 = ten.X; _ref4 <= _ref5 ? _j <= _ref5 : _j >= _ref5; s = _j += _ref6) {
         y = this.Y2y(s);
         st = (Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s);
         if (parseFloat(st) !== 0) {
@@ -268,8 +296,8 @@
     };
 
     function GraphIt() {
-      var $canvas, $ft, n, nwx, nwy;
-      var _this = this;
+      var $canvas, $ft, n, nwx, nwy, _i,
+        _this = this;
       ($ft = $("#ft")).bind("input", function() {
         var functionValue;
         functionValue = $ft.val();
@@ -366,13 +394,13 @@
         } else if (event.keyCode === 83) {
           $("#theme")[0].href = _this.themes[++_this.theme % _this.themes.length] + ".css";
         } else if (event.keyCode === 77) {
-          _this.polar.range *= 2;
+          _this.polar_range *= 2;
         } else if (event.keyCode === 76) {
-          _this.polar.range /= 2;
+          _this.polar_range /= 2;
         } else if (event.keyCode === 80) {
-          _this.polar.step *= 2;
+          _this.polar_step *= 2;
         } else if (event.keyCode === 79) {
-          _this.polar.step /= 2;
+          _this.polar_step /= 2;
         } else if (event.keyCode === 39) {
           w = _this.reg.X.max - _this.reg.X.min;
           _this.reg.X.min += w / 10;
@@ -390,7 +418,13 @@
           _this.reg.Y.min -= w / 10;
           _this.reg.Y.max -= w / 10;
         } else if (event.ctrlKey && event.keyCode === 32) {
-          _this.functions[_this.selected].polar = !_this.functions[_this.selected].polar;
+          if (_this.functions[_this.selected].type === 'linear') {
+            _this.functions[_this.selected].type = 'polar';
+          } else if (_this.functions[_this.selected].type === 'polar') {
+            _this.functions[_this.selected].type = 'horizontal';
+          } else if (_this.functions[_this.selected].type === 'horizontal') {
+            _this.functions[_this.selected].type = 'linear';
+          }
           _this.updateBox();
           _this.replot();
         } else if (event.keyCode === 33) {
@@ -420,10 +454,10 @@
       this.reg.X.max += nwx;
       this.reg.Y.min -= nwy;
       this.reg.Y.max += nwy;
-      for (n = 1; n <= 15; n++) {
+      for (n = _i = 1; _i <= 15; n = ++_i) {
         this.functions[n] = {
           expr: "",
-          polar: false,
+          type: 'linear',
           error: false
         };
       }
