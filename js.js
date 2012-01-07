@@ -1,45 +1,77 @@
 (function() {
-  var GraphIt;
+  var GraphIt, State;
+
+  State = (function() {
+
+    State.name = 'State';
+
+    function State() {
+      var n, _i;
+      this.pow = 1.1;
+      this.step = 1;
+      this.functions = [
+        {
+          expr: "sin(pow(x, 4))/x",
+          type: 'linear',
+          error: false
+        }
+      ];
+      for (n = _i = 1; _i <= 15; n = ++_i) {
+        this.functions[n] = {
+          expr: "",
+          type: 'linear',
+          error: false
+        };
+      }
+      this.selected = 0;
+      this.theme = 0;
+      this.polar_range = 2;
+      this.polar_step = 180;
+      this.parametric_range = 10;
+      this.parametric_step = .1;
+      this.reg = {
+        X: {
+          min: -Math.pow(this.pow, 5),
+          max: Math.pow(this.pow, 5),
+          zcoef: 5
+        },
+        Y: {
+          min: -Math.pow(this.pow, 5),
+          max: Math.pow(this.pow, 5),
+          zcoef: 5
+        },
+        tickSize: 5
+      };
+    }
+
+    return State;
+
+  })();
 
   GraphIt = (function() {
 
     GraphIt.name = 'GraphIt';
 
-    GraphIt.prototype.pow = 1.1;
-
-    GraphIt.prototype.step = 1;
-
-    GraphIt.prototype.functions = [
-      {
-        expr: "sin(pow(x, 4))/x",
-        type: 'linear',
-        error: false
+    GraphIt.prototype.function_types = {
+      linear: {
+        symbol: "&#x1D487;",
+        next: 'polar'
+      },
+      polar: {
+        symbol: "&#x1D746;",
+        next: 'horizontal'
+      },
+      horizontal: {
+        symbol: "&#x1D489;",
+        next: 'parametric'
+      },
+      parametric: {
+        symbol: "&#x1D499;",
+        next: 'linear'
       }
-    ];
-
-    GraphIt.prototype.selected = 0;
+    };
 
     GraphIt.prototype.themes = ["tango", "pastel", "white"];
-
-    GraphIt.prototype.theme = 0;
-
-    GraphIt.prototype.polar_range = 2;
-
-    GraphIt.prototype.polar_step = 180;
-
-    GraphIt.prototype.reg = {
-      X: {
-        min: 0,
-        max: 0,
-        zcoef: 5
-      },
-      Y: {
-        min: 0,
-        max: 0,
-        zcoef: 5
-      },
-      tickSize: 5
-    };
 
     GraphIt.prototype.dragging = {
       on: false,
@@ -60,33 +92,33 @@
     };
 
     GraphIt.prototype.x2X = function(x) {
-      return this.reg.X.min + (x * (this.reg.X.max - this.reg.X.min) / this.scr.w);
+      return this.state.reg.X.min + (x * (this.state.reg.X.max - this.state.reg.X.min) / this.scr.w);
     };
 
     GraphIt.prototype.X2x = function(X) {
-      return this.scr.w * (X - this.reg.X.min) / (this.reg.X.max - this.reg.X.min);
+      return this.scr.w * (X - this.state.reg.X.min) / (this.state.reg.X.max - this.state.reg.X.min);
     };
 
     GraphIt.prototype.dx2DX = function(dx) {
-      return dx * (this.reg.X.max - this.reg.X.min) / this.scr.w;
+      return dx * (this.state.reg.X.max - this.state.reg.X.min) / this.scr.w;
     };
 
     GraphIt.prototype.y2Y = function(y) {
-      return this.reg.Y.min + ((this.scr.h - y) * (this.reg.Y.max - this.reg.Y.min) / this.scr.h);
+      return this.state.reg.Y.min + ((this.scr.h - y) * (this.state.reg.Y.max - this.state.reg.Y.min) / this.scr.h);
     };
 
     GraphIt.prototype.Y2y = function(Y) {
-      return this.scr.h - this.scr.h * (Y - this.reg.Y.min) / (this.reg.Y.max - this.reg.Y.min);
+      return this.scr.h - this.scr.h * (Y - this.state.reg.Y.min) / (this.state.reg.Y.max - this.state.reg.Y.min);
     };
 
     GraphIt.prototype.dy2DY = function(dy) {
-      return dy * (this.reg.Y.max - this.reg.Y.min) / this.scr.h;
+      return dy * (this.state.reg.Y.max - this.state.reg.Y.min) / this.scr.h;
     };
 
     GraphIt.prototype.updateBox = function() {
-      $("#pft").html(this.functions[this.selected].type === 'polar' ? "&#x1D746;" : "&#x1D487;");
-      $("#nft").addClass("line-color-" + this.selected);
-      return $("#nft").text(this.selected);
+      $("#pft").html(this.function_types[this.state.functions[this.state.selected].type].symbol);
+      $("#nft").addClass("line-color-" + this.state.selected);
+      return $("#nft").text(this.state.selected);
     };
 
     GraphIt.prototype.prepareFunction = function(ftexp) {
@@ -101,12 +133,12 @@
         c = _ref2[_j];
         ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c);
       }
-      return ftexp;
+      return ftexp.split(';');
     };
 
     GraphIt.prototype.newSelected = function() {
-      $("#ft").val(this.functions[this.selected].expr);
-      if (this.functions[this.selected].error) {
+      $("#ft").val(this.state.functions[this.state.selected].expr);
+      if (this.state.functions[this.state.selected].error) {
         $("#ft").addClass("error");
       } else {
         $("#ft").removeClass("error");
@@ -115,106 +147,128 @@
     };
 
     GraphIt.prototype.linear = function(funct, f) {
-      var X, Y, lineNext, x, y, _i, _ref;
+      var Y, lineNext, x, y, _i, _ref, _results;
       lineNext = false;
+      _results = [];
       for (x = _i = 0, _ref = this.scr.w; 0 <= _ref ? _i <= _ref : _i >= _ref; x = 0 <= _ref ? ++_i : --_i) {
-        X = this.x2X(x);
-        try {
-          Y = funct(X);
-          if (isFinite(Y)) {
-            y = this.Y2y(Y);
-            if (lineNext) {
-              this.c.lineTo(x, y);
-            } else {
-              this.c.moveTo(x, y);
-              lineNext = true;
-            }
+        Y = funct[0](this.x2X(x));
+        if (isFinite(Y)) {
+          y = this.Y2y(Y);
+          if (lineNext) {
+            _results.push(this.c.lineTo(x, y));
           } else {
-            lineNext = false;
+            this.c.moveTo(x, y);
+            _results.push(lineNext = true);
           }
-        } catch (e) {
-          f.error = true;
-          console.log("Stopping plot, error with " + funct + " : " + e);
-          return;
+        } else {
+          _results.push(lineNext = false);
         }
       }
-      return f.error = false;
+      return _results;
     };
 
     GraphIt.prototype.horizontal = function(funct, f) {
-      var X, Y, lineNext, x, y, _i, _ref;
+      var X, Y, lineNext, x, y, _i, _ref, _results;
       lineNext = false;
+      _results = [];
       for (y = _i = 0, _ref = this.scr.h; 0 <= _ref ? _i <= _ref : _i >= _ref; y = 0 <= _ref ? ++_i : --_i) {
         Y = this.y2Y(y);
-        try {
-          X = funct(Y);
-          if (isFinite(X)) {
-            x = this.X2x(X);
-            if (lineNext) {
-              this.c.lineTo(x, y);
-            } else {
-              this.c.moveTo(x, y);
-              lineNext = true;
-            }
+        X = funct[0](Y);
+        if (isFinite(X)) {
+          x = this.X2x(X);
+          if (lineNext) {
+            _results.push(this.c.lineTo(x, y));
           } else {
-            lineNext = false;
+            this.c.moveTo(x, y);
+            _results.push(lineNext = true);
           }
-        } catch (e) {
-          f.error = true;
-          console.log("Stopping plot, error with " + funct + " : " + e);
-          return;
+        } else {
+          _results.push(lineNext = false);
         }
       }
-      return f.error = false;
+      return _results;
     };
 
     GraphIt.prototype.polar = function(funct, f) {
-      var X, Y, lineNext, o, r, x, y, _i, _ref, _ref2;
+      var X, Y, lineNext, o, r, x, y, _i, _ref, _ref2, _results;
       lineNext = false;
-      for (o = _i = 0, _ref = this.polar_range * Math.PI, _ref2 = Math.PI / this.polar_step; 0 <= _ref ? _i <= _ref : _i >= _ref; o = _i += _ref2) {
-        try {
-          r = funct(o);
-          if (isFinite(r)) {
-            X = r * Math.cos(o);
-            Y = r * Math.sin(o);
-            x = this.X2x(X);
-            y = this.Y2y(Y);
-            if (lineNext) {
-              this.c.lineTo(x, y);
-            } else {
-              this.c.moveTo(x, y);
-              lineNext = true;
-            }
+      _results = [];
+      for (o = _i = 0, _ref = this.state.polar_range * Math.PI, _ref2 = Math.PI / this.state.polar_step; 0 <= _ref ? _i <= _ref : _i >= _ref; o = _i += _ref2) {
+        r = funct[0](o);
+        if (isFinite(r)) {
+          X = r * Math.cos(o);
+          Y = r * Math.sin(o);
+          x = this.X2x(X);
+          y = this.Y2y(Y);
+          if (lineNext) {
+            _results.push(this.c.lineTo(x, y));
           } else {
-            lineNext = false;
+            this.c.moveTo(x, y);
+            _results.push(lineNext = true);
           }
-        } catch (e) {
-          f.error = true;
-          console.log("Stopping plot, error with " + funct + " : " + e);
-          return;
+        } else {
+          _results.push(lineNext = false);
         }
       }
-      return f.error = false;
+      return _results;
+    };
+
+    GraphIt.prototype.parametric = function(funct, f) {
+      var X, Y, lineNext, t, x, y, _i, _ref, _ref2, _results;
+      lineNext = false;
+      _results = [];
+      for (t = _i = 0, _ref = this.state.parametric_range, _ref2 = this.state.parametric_step; 0 <= _ref ? _i <= _ref : _i >= _ref; t = _i += _ref2) {
+        X = funct[0](t);
+        Y = funct[1](t);
+        if (isFinite(X) && isFinite(Y)) {
+          x = this.X2x(X);
+          y = this.Y2y(Y);
+          if (lineNext) {
+            _results.push(this.c.lineTo(x, y));
+          } else {
+            this.c.moveTo(x, y);
+            _results.push(lineNext = true);
+          }
+        } else {
+          _results.push(lineNext = false);
+        }
+      }
+      return _results;
     };
 
     GraphIt.prototype.plot = function() {
-      var f, functionValue, i, time, _i, _len, _ref;
+      var f, fun, i, time, _i, _len, _ref;
       $("#ft").removeClass("error");
       time = new Date().getTime();
-      _ref = this.functions;
+      _ref = this.state.functions;
       for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
         f = _ref[i];
         if (f.expr === "") break;
-        functionValue = this.prepareFunction(f.expr);
         this.c.strokeStyle = $(".line-color-" + i).css("color");
         this.c.beginPath();
-        this[f.type]((function(x) {
-          return eval(functionValue);
-        }), f);
+        try {
+          this[f.type]((function() {
+            var _j, _len2, _ref2, _results;
+            _ref2 = this.prepareFunction(f.expr);
+            _results = [];
+            for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+              fun = _ref2[_j];
+              _results.push(new Function('x', 'return ' + fun));
+            }
+            return _results;
+          }).call(this), f);
+        } catch (e) {
+          console.log(e);
+          f.error = true;
+          break;
+        }
+        f.error = false;
         this.c.stroke();
       }
-      document.title = new Date().getTime() - time;
-      if (this.functions[this.selected].error) return $("#ft").addClass("error");
+      document.title = (new Date().getTime() - time) + "ms";
+      if (this.state.functions[this.state.selected].error) {
+        return $("#ft").addClass("error");
+      }
     };
 
     GraphIt.prototype.replot = function() {
@@ -235,8 +289,8 @@
       this.c.beginPath();
       this.c.fillStyle = $(".ticknum").css("color");
       range = {
-        X: this.reg.X.max - this.reg.X.min,
-        Y: this.reg.Y.max - this.reg.Y.min
+        X: this.state.reg.X.max - this.state.reg.X.min,
+        Y: this.state.reg.Y.max - this.state.reg.Y.min
       };
       order = {
         X: Math.floor(Math.log(range.X) / Math.log(10)),
@@ -265,29 +319,29 @@
         ten.Y *= .5;
       }
       min = {
-        X: Math.floor(this.reg.X.min / ten.X) * ten.X,
-        Y: Math.floor(this.reg.Y.min / ten.Y) * ten.Y
+        X: Math.floor(this.state.reg.X.min / ten.X) * ten.X,
+        Y: Math.floor(this.state.reg.Y.min / ten.Y) * ten.Y
       };
       max = {
-        X: Math.floor(this.reg.X.max / ten.X) * ten.X,
-        Y: Math.floor(this.reg.Y.max / ten.Y) * ten.Y
+        X: Math.floor(this.state.reg.X.max / ten.X) * ten.X,
+        Y: Math.floor(this.state.reg.Y.max / ten.Y) * ten.Y
       };
       for (s = _i = _ref = min.X, _ref2 = max.X, _ref3 = ten.X; _ref <= _ref2 ? _i <= _ref2 : _i >= _ref2; s = _i += _ref3) {
         x = this.X2x(s);
         st = (ten.X < 1 ? s.toFixed(fixrange.X) : s);
         if (parseFloat(st) !== 0) {
-          this.c.moveTo(x, yY0 - (isBottom ? this.reg.tickSize : 0));
-          this.c.lineTo(x, yY0 + (isBottom ? 0 : this.reg.tickSize));
-          this.c.fillText(st, x - 3, yY0 + (1.5 * this.reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
+          this.c.moveTo(x, yY0 - (isBottom ? this.state.reg.tickSize : 0));
+          this.c.lineTo(x, yY0 + (isBottom ? 0 : this.state.reg.tickSize));
+          this.c.fillText(st, x - 3, yY0 + (1.5 * this.state.reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
         }
       }
       for (s = _j = _ref4 = min.Y, _ref5 = max.Y, _ref6 = ten.X; _ref4 <= _ref5 ? _j <= _ref5 : _j >= _ref5; s = _j += _ref6) {
         y = this.Y2y(s);
         st = (Math.abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s);
         if (parseFloat(st) !== 0) {
-          this.c.moveTo(xX0 + (isRight ? 0 : this.reg.tickSize), y);
-          this.c.lineTo(xX0 - (isRight ? this.reg.tickSize : 0), y);
-          this.c.fillText(st, xX0 + (1.5 * this.reg.tickSize + (isRight ? 5 * new String(st).length : 0)) * (isRight ? -1 : 1), y + 3);
+          this.c.moveTo(xX0 + (isRight ? 0 : this.state.reg.tickSize), y);
+          this.c.lineTo(xX0 - (isRight ? this.state.reg.tickSize : 0), y);
+          this.c.fillText(st, xX0 + (1.5 * this.state.reg.tickSize + (isRight ? 5 * new String(st).length : 0)) * (isRight ? -1 : 1), y + 3);
         }
       }
       this.c.stroke();
@@ -296,12 +350,17 @@
     };
 
     function GraphIt() {
-      var $canvas, $ft, n, nwx, nwy, _i,
+      var $canvas, $ft,
         _this = this;
+      if (location.hash !== "") {
+        this.state = JSON.parse(location.hash.slice(1));
+      } else {
+        this.state = new State();
+      }
       ($ft = $("#ft")).bind("input", function() {
         var functionValue;
         functionValue = $ft.val();
-        _this.functions[_this.selected].expr = functionValue;
+        _this.state.functions[_this.state.selected].expr = functionValue;
         return _this.replot();
       }).keydown(function(e) {
         var _ref;
@@ -322,10 +381,10 @@
         if (!_this.dragging.on) return;
         DX = _this.dx2DX(_this.dragging.x - event.clientX);
         DY = _this.dy2DY(_this.dragging.y - event.clientY);
-        _this.reg.X.min += DX;
-        _this.reg.X.max += DX;
-        _this.reg.Y.min -= DY;
-        _this.reg.Y.max -= DY;
+        _this.state.reg.X.min += DX;
+        _this.state.reg.X.max += DX;
+        _this.state.reg.Y.min -= DY;
+        _this.state.reg.Y.max -= DY;
         _this.dragging.x = event.clientX;
         _this.dragging.y = event.clientY;
         event.stopPropagation();
@@ -342,27 +401,27 @@
         var dx, dy;
         if (delta < 0) {
           if (!event.shiftKey && _this.mode !== "y") {
-            _this.reg.X.zcoef += _this.step;
-            dx = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
+            _this.state.reg.X.zcoef += _this.state.step;
+            dx = (Math.pow(_this.state.pow, _this.state.step) - 1) * Math.pow(_this.state.pow, _this.state.reg.X.zcoef - _this.state.step);
           }
           if (!event.altKey && _this.mode !== "x") {
-            _this.reg.Y.zcoef += _this.step;
-            dy = (Math.pow(_this.pow, _this.step) - 1) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
+            _this.state.reg.Y.zcoef += _this.state.step;
+            dy = (Math.pow(_this.state.pow, _this.state.step) - 1) * Math.pow(_this.state.pow, _this.state.reg.Y.zcoef - _this.state.step);
           }
         } else {
           if (!event.shiftKey && _this.mode !== "y") {
-            dx = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.X.zcoef - _this.step);
-            _this.reg.X.zcoef -= _this.step;
+            dx = (1 - Math.pow(_this.state.pow, _this.state.step)) * Math.pow(_this.state.pow, _this.state.reg.X.zcoef - _this.state.step);
+            _this.state.reg.X.zcoef -= _this.state.step;
           }
           if (!event.altKey && _this.mode !== "x") {
-            dy = (1 - Math.pow(_this.pow, _this.step)) * Math.pow(_this.pow, _this.reg.Y.zcoef - _this.step);
-            _this.reg.Y.zcoef -= _this.step;
+            dy = (1 - Math.pow(_this.state.pow, _this.state.step)) * Math.pow(_this.state.pow, _this.state.reg.Y.zcoef - _this.state.step);
+            _this.state.reg.Y.zcoef -= _this.state.step;
           }
         }
-        _this.reg.X.min -= (2 * dx * event.clientX) / _this.scr.w;
-        _this.reg.X.max += (2 * dx * (_this.scr.w - event.clientX)) / _this.scr.w;
-        _this.reg.Y.min -= (2 * dy * (_this.scr.h - event.clientY)) / _this.scr.h;
-        _this.reg.Y.max += (2 * dy * event.clientY) / _this.scr.h;
+        _this.state.reg.X.min -= (2 * dx * event.clientX) / _this.scr.w;
+        _this.state.reg.X.max += (2 * dx * (_this.scr.w - event.clientX)) / _this.scr.w;
+        _this.state.reg.Y.min -= (2 * dy * (_this.scr.h - event.clientY)) / _this.scr.h;
+        _this.state.reg.Y.max += (2 * dy * event.clientY) / _this.scr.h;
         _this.replot();
         event.stopPropagation();
         return false;
@@ -377,66 +436,69 @@
           _this.mode = null;
         }
         if (event.keyCode === 82) {
-          rX = _this.reg.X.max - _this.reg.X.min;
-          rY = _this.reg.Y.max - _this.reg.Y.min;
-          _this.reg.X.min = -rX / 2;
-          _this.reg.X.max = rX / 2;
-          _this.reg.Y.min = -rY / 2;
-          _this.reg.Y.max = rY / 2;
+          rX = _this.state.reg.X.max - _this.state.reg.X.min;
+          rY = _this.state.reg.Y.max - _this.state.reg.Y.min;
+          _this.state.reg.X.min = -rX / 2;
+          _this.state.reg.X.max = rX / 2;
+          _this.state.reg.Y.min = -rY / 2;
+          _this.state.reg.Y.max = rY / 2;
         } else if (event.keyCode === 84) {
-          _this.reg.X.zcoef = _this.reg.Y.zcoef = 5;
-          nwx = Math.pow(_this.pow, _this.reg.X.zcoef);
-          nwy = Math.pow(_this.pow, _this.reg.Y.zcoef);
-          _this.reg.X.min = -nwx;
-          _this.reg.X.max = nwx;
-          _this.reg.Y.min = -nwy;
-          _this.reg.Y.max = nwy;
+          _this.state.reg.X.zcoef = _this.state.reg.Y.zcoef = 5;
+          nwx = Math.pow(_this.state.pow, _this.state.reg.X.zcoef);
+          nwy = Math.pow(_this.state.pow, _this.state.reg.Y.zcoef);
+          _this.state.reg.X.min = -nwx;
+          _this.state.reg.X.max = nwx;
+          _this.state.reg.Y.min = -nwy;
+          _this.state.reg.Y.max = nwy;
         } else if (event.keyCode === 83) {
-          $("#theme")[0].href = _this.themes[++_this.theme % _this.themes.length] + ".css";
+          $("#theme")[0].href = _this.themes[++_this.state.theme % _this.themes.length] + ".css";
         } else if (event.keyCode === 77) {
-          _this.polar_range *= 2;
+          _this.state.polar_range *= 2;
         } else if (event.keyCode === 76) {
-          _this.polar_range /= 2;
+          _this.state.polar_range /= 2;
         } else if (event.keyCode === 80) {
-          _this.polar_step *= 2;
+          _this.state.polar_step *= 2;
         } else if (event.keyCode === 79) {
-          _this.polar_step /= 2;
+          _this.state.polar_step /= 2;
         } else if (event.keyCode === 39) {
-          w = _this.reg.X.max - _this.reg.X.min;
-          _this.reg.X.min += w / 10;
-          _this.reg.X.max += w / 10;
+          w = _this.state.reg.X.max - _this.state.reg.X.min;
+          _this.state.reg.X.min += w / 10;
+          _this.state.reg.X.max += w / 10;
         } else if (event.keyCode === 37) {
-          w = _this.reg.X.max - _this.reg.X.min;
-          _this.reg.X.min -= w / 10;
-          _this.reg.X.max -= w / 10;
+          w = _this.state.reg.X.max - _this.state.reg.X.min;
+          _this.state.reg.X.min -= w / 10;
+          _this.state.reg.X.max -= w / 10;
         } else if (event.keyCode === 38) {
-          w = _this.reg.Y.max - _this.reg.Y.min;
-          _this.reg.Y.min += w / 10;
-          _this.reg.Y.max += w / 10;
+          w = _this.state.reg.Y.max - _this.state.reg.Y.min;
+          _this.state.reg.Y.min += w / 10;
+          _this.state.reg.Y.max += w / 10;
         } else if (event.keyCode === 40) {
-          w = _this.reg.Y.max - _this.reg.Y.min;
-          _this.reg.Y.min -= w / 10;
-          _this.reg.Y.max -= w / 10;
+          w = _this.state.reg.Y.max - _this.state.reg.Y.min;
+          _this.state.reg.Y.min -= w / 10;
+          _this.state.reg.Y.max -= w / 10;
         } else if (event.ctrlKey && event.keyCode === 32) {
-          if (_this.functions[_this.selected].type === 'linear') {
-            _this.functions[_this.selected].type = 'polar';
-          } else if (_this.functions[_this.selected].type === 'polar') {
-            _this.functions[_this.selected].type = 'horizontal';
-          } else if (_this.functions[_this.selected].type === 'horizontal') {
-            _this.functions[_this.selected].type = 'linear';
-          }
+          _this.state.functions[_this.state.selected].type = _this.function_types[_this.state.functions[_this.state.selected].type].next;
           _this.updateBox();
           _this.replot();
         } else if (event.keyCode === 33) {
-          $("#nft").removeClass("line-color-" + _this.selected);
-          _this.selected++;
-          if (_this.selected > 15) _this.selected = 0;
+          $("#nft").removeClass("line-color-" + _this.state.selected);
+          _this.state.selected++;
+          if (_this.state.selected > 15) _this.state.selected = 0;
           _this.newSelected();
         } else if (event.keyCode === 34) {
-          $("#nft").removeClass("line-color-" + _this.selected);
-          _this.selected--;
-          if (_this.selected < 0) _this.selected = 15;
+          $("#nft").removeClass("line-color-" + _this.state.selected);
+          _this.state.selected--;
+          if (_this.state.selected < 0) _this.state.selected = 15;
           _this.newSelected();
+        } else if (event.keyCode === 46) {
+          _this.state = new State();
+          location.hash = '';
+          _this.updateBox();
+          $("#nft").removeClass("line-color-" + _this.state.selected);
+          $("#ft").val(_this.state.functions[_this.state.selected].expr);
+          $("#ft").trigger('input');
+        } else if (event.keyCode === 27) {
+          location.hash = JSON.stringify(_this.state);
         } else {
           return;
         }
@@ -448,21 +510,8 @@
       this.canvas = $canvas.get(0);
       this.c = this.canvas.getContext("2d");
       this.size();
-      nwx = Math.pow(this.pow, this.reg.X.zcoef);
-      nwy = Math.pow(this.pow, this.reg.Y.zcoef);
-      this.reg.X.min -= nwx;
-      this.reg.X.max += nwx;
-      this.reg.Y.min -= nwy;
-      this.reg.Y.max += nwy;
-      for (n = _i = 1; _i <= 15; n = ++_i) {
-        this.functions[n] = {
-          expr: "",
-          type: 'linear',
-          error: false
-        };
-      }
       this.updateBox();
-      $ft.val(this.functions[0].expr);
+      $ft.val(this.state.functions[this.state.selected].expr);
       $ft.trigger('input');
     }
 

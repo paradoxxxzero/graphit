@@ -15,30 +15,53 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 
+class State
+    constructor: ->
+        @pow = 1.1
+        @step = 1
+        @functions = [
+           expr: "sin(pow(x, 4))/x"
+           type: 'linear'
+           error: false
+        ]
+        for n in [1..15]
+            @functions[n] =
+                expr: ""
+                type: 'linear'
+                error: false
+        @selected = 0
+        @theme = 0
+        @polar_range = 2
+        @polar_step = 180
+        @parametric_range = 10
+        @parametric_step = .1
+        @reg =
+            X:
+                min: -Math.pow(@pow, 5)
+                max: Math.pow(@pow, 5)
+                zcoef: 5
+            Y:
+                min: -Math.pow(@pow, 5)
+                max: Math.pow(@pow, 5)
+                zcoef: 5
+            tickSize: 5
 
 class GraphIt
-    pow: 1.1
-    step: 1
-    functions: [
-       expr: "sin(pow(x, 4))/x"
-       type: 'linear'
-       error: false
-    ]
-    selected: 0
+    function_types:
+        linear:
+            symbol: "&#x1D487;"
+            next: 'polar'
+        polar:
+            symbol: "&#x1D746;"
+            next: 'horizontal'
+        horizontal:
+            symbol: "&#x1D489;"
+            next: 'parametric'
+        parametric:
+            symbol: "&#x1D499;"
+            next: 'linear'
+
     themes: [ "tango", "pastel", "white" ]
-    theme: 0
-    polar_range: 2
-    polar_step: 180
-    reg:
-        X:
-            min: 0
-            max: 0
-            zcoef: 5
-        Y:
-            min: 0
-            max: 0
-            zcoef: 5
-        tickSize: 5
 
     dragging:
         on: false
@@ -55,39 +78,39 @@ class GraphIt
             w: @canvas.width = window.innerWidth
 
     x2X: (x) ->
-        @reg.X.min + (x * (@reg.X.max - @reg.X.min) / @scr.w)
+        @state.reg.X.min + (x * (@state.reg.X.max - @state.reg.X.min) / @scr.w)
 
     X2x: (X) ->
-        @scr.w * (X - @reg.X.min) / (@reg.X.max - @reg.X.min)
+        @scr.w * (X - @state.reg.X.min) / (@state.reg.X.max - @state.reg.X.min)
 
     dx2DX: (dx) ->
-        dx * (@reg.X.max - @reg.X.min) / @scr.w
+        dx * (@state.reg.X.max - @state.reg.X.min) / @scr.w
 
     y2Y: (y) ->
-        @reg.Y.min + ((@scr.h - y) * (@reg.Y.max - @reg.Y.min) / @scr.h)
+        @state.reg.Y.min + ((@scr.h - y) * (@state.reg.Y.max - @state.reg.Y.min) / @scr.h)
 
     Y2y: (Y) ->
-        @scr.h - @scr.h * (Y - @reg.Y.min) / (@reg.Y.max - @reg.Y.min)
+        @scr.h - @scr.h * (Y - @state.reg.Y.min) / (@state.reg.Y.max - @state.reg.Y.min)
 
     dy2DY: (dy) ->
-        dy * (@reg.Y.max - @reg.Y.min) / @scr.h
+        dy * (@state.reg.Y.max - @state.reg.Y.min) / @scr.h
 
     updateBox: ->
-        $("#pft").html(if @functions[@selected].type is 'polar' then "&#x1D746;" else "&#x1D487;")
-        $("#nft").addClass "line-color-" + @selected
-        $("#nft").text @selected
-        # $("#var").text(if @functions[@selected].type is 'horizontal'  then "y" else "x")
+        $("#pft").html @function_types[@state.functions[@state.selected].type].symbol
+        $("#nft").addClass "line-color-" + @state.selected
+        $("#nft").text @state.selected
+        # $("#var").text(if @state.functions[@state.selected].type is 'horizontal'  then "y" else "x")
 
     prepareFunction: (ftexp) ->
         for f in @Math.functions
             ftexp = ftexp.replace(new RegExp(f + "\\(", "g"), "Math." + f + "(")
         for c in @Math.constants
             ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c)
-        ftexp
+        ftexp.split ';'
 
     newSelected: ->
-        $("#ft").val @functions[@selected].expr
-        if @functions[@selected].error
+        $("#ft").val @state.functions[@state.selected].expr
+        if @state.functions[@state.selected].error
             $("#ft").addClass "error"
         else
             $("#ft").removeClass "error"
@@ -96,80 +119,82 @@ class GraphIt
     linear: (funct, f) ->
         lineNext = false
         for x in [0..@scr.w]
-            X = @x2X(x)
-            try
-                Y = funct(X)
-                if isFinite(Y)
-                    y = @Y2y(Y)
-                    if lineNext
-                        @c.lineTo x, y
-                    else
-                        @c.moveTo x, y
-                        lineNext = true
+            Y = funct[0](@x2X(x))
+            if isFinite(Y)
+                y = @Y2y(Y)
+                if lineNext
+                    @c.lineTo x, y
                 else
-                  lineNext = false
-            catch e
-                f.error = true
-                console.log "Stopping plot, error with " + funct + " : " + e
-                return
-        f.error = false
+                    @c.moveTo x, y
+                    lineNext = true
+            else
+              lineNext = false
 
     horizontal: (funct, f) ->
         lineNext = false
         for y in [0..@scr.h]
             Y = @y2Y(y)
-            try
-                X = funct(Y)
-                if isFinite(X)
-                    x = @X2x(X)
-                    if lineNext
-                        @c.lineTo x, y
-                    else
-                        @c.moveTo x, y
-                        lineNext = true
+            X = funct[0](Y)
+            if isFinite(X)
+                x = @X2x(X)
+                if lineNext
+                    @c.lineTo x, y
                 else
-                  lineNext = false
-            catch e
-                f.error = true
-                console.log "Stopping plot, error with " + funct + " : " + e
-                return
-        f.error = false
+                    @c.moveTo x, y
+                    lineNext = true
+            else
+              lineNext = false
 
     polar: (funct, f) ->
         lineNext = false
-        for o in [0..@polar_range * Math.PI] by Math.PI / @polar_step
-            try
-                r = funct(o)
-                if isFinite(r)
-                    X = r * Math.cos(o)
-                    Y = r * Math.sin(o)
-                    x = @X2x(X)
-                    y = @Y2y(Y)
-                    if lineNext
-                        @c.lineTo x, y
-                    else
-                        @c.moveTo x, y
-                        lineNext = true
+        for o in [0..@state.polar_range * Math.PI] by Math.PI / @state.polar_step
+            r = funct[0](o)
+            if isFinite(r)
+                X = r * Math.cos(o)
+                Y = r * Math.sin(o)
+                x = @X2x(X)
+                y = @Y2y(Y)
+                if lineNext
+                    @c.lineTo x, y
                 else
-                    lineNext = false
-            catch e
-                f.error = true
-                console.log "Stopping plot, error with " + funct + " : " + e
-                return
-        f.error = false
+                    @c.moveTo x, y
+                    lineNext = true
+            else
+                lineNext = false
+
+    parametric: (funct, f) ->
+        lineNext = false
+        for t in [0..@state.parametric_range] by @state.parametric_step
+            X = funct[0](t)
+            Y = funct[1](t)
+            if isFinite(X) and isFinite(Y)
+                x = @X2x(X)
+                y = @Y2y(Y)
+                if lineNext
+                    @c.lineTo x, y
+                else
+                    @c.moveTo x, y
+                    lineNext = true
+            else
+                lineNext = false
 
     plot: ->
         $("#ft").removeClass("error")
         time = new Date().getTime()
-        for f, i in @functions
+        for f, i in @state.functions
             break if f.expr is ""
-            functionValue = @prepareFunction(f.expr)
             @c.strokeStyle = $(".line-color-" + i).css("color")
             @c.beginPath()
-            @[f.type](((x) -> eval functionValue), f)
+            try
+                @[f.type](new Function('x', 'return ' + fun) for fun in @prepareFunction(f.expr), f)
+            catch e
+                console.log e
+                f.error = true
+                break
+            f.error = false
             @c.stroke()
-        document.title = new Date().getTime() - time
-        $("#ft").addClass("error") if @functions[@selected].error
+        document.title = (new Date().getTime() - time) + "ms"
+        $("#ft").addClass("error") if @state.functions[@state.selected].error
 
     replot: ->
         @c.fillStyle = $(".bg").css("color")
@@ -188,8 +213,8 @@ class GraphIt
         @c.beginPath()
         @c.fillStyle = $(".ticknum").css("color")
         range =
-            X: @reg.X.max - @reg.X.min
-            Y: @reg.Y.max - @reg.Y.min
+            X: @state.reg.X.max - @state.reg.X.min
+            Y: @state.reg.Y.max - @state.reg.Y.min
 
         order =
             X: Math.floor(Math.log(range.X) / Math.log(10))
@@ -216,35 +241,40 @@ class GraphIt
             fixrange.Y++
             ten.Y *= .5
         min =
-            X: Math.floor(@reg.X.min / ten.X) * ten.X
-            Y: Math.floor(@reg.Y.min / ten.Y) * ten.Y
+            X: Math.floor(@state.reg.X.min / ten.X) * ten.X
+            Y: Math.floor(@state.reg.Y.min / ten.Y) * ten.Y
 
         max =
-            X: Math.floor(@reg.X.max / ten.X) * ten.X
-            Y: Math.floor(@reg.Y.max / ten.Y) * ten.Y
+            X: Math.floor(@state.reg.X.max / ten.X) * ten.X
+            Y: Math.floor(@state.reg.Y.max / ten.Y) * ten.Y
 
         for s in [min.X..max.X] by ten.X
             x = @X2x(s)
             st = (if ten.X < 1 then s.toFixed(fixrange.X) else s)
             unless parseFloat(st) is 0
-                @c.moveTo x, yY0 - (if isBottom then @reg.tickSize else 0)
-                @c.lineTo x, yY0 + (if isBottom then 0 else @reg.tickSize)
-                @c.fillText st, x - 3, yY0 + (1.5 * @reg.tickSize + (if isBottom then 2 else 10)) * (if isBottom then -1 else 1)
+                @c.moveTo x, yY0 - (if isBottom then @state.reg.tickSize else 0)
+                @c.lineTo x, yY0 + (if isBottom then 0 else @state.reg.tickSize)
+                @c.fillText st, x - 3, yY0 + (1.5 * @state.reg.tickSize + (if isBottom then 2 else 10)) * (if isBottom then -1 else 1)
         for s in [min.Y..max.Y] by ten.X
             y = @Y2y(s)
             st = (if Math.abs(ten.Y) < 1 then s.toFixed(fixrange.Y) else s)
             unless parseFloat(st) is 0
-                @c.moveTo xX0 + (if isRight then 0 else @reg.tickSize), y
-                @c.lineTo xX0 - (if isRight then @reg.tickSize else 0), y
-                @c.fillText st, xX0 + (1.5 * @reg.tickSize + (if isRight then 5 * new String(st).length else 0)) * (if isRight then -1 else 1), y + 3
+                @c.moveTo xX0 + (if isRight then 0 else @state.reg.tickSize), y
+                @c.lineTo xX0 - (if isRight then @state.reg.tickSize else 0), y
+                @c.fillText st, xX0 + (1.5 * @state.reg.tickSize + (if isRight then 5 * new String(st).length else 0)) * (if isRight then -1 else 1), y + 3
         @c.stroke()
         @c.fillStyle = $(".bg").css("color")
         @plot()
 
     constructor: ->
+        if location.hash != ""
+            @state = JSON.parse location.hash.slice(1)
+        else
+            @state = new State()
+
         ($ft = $("#ft")).bind("input", =>
             functionValue = $ft.val()
-            @functions[@selected].expr = functionValue
+            @state.functions[@state.selected].expr = functionValue
             @replot()
         ).keydown (e) ->
             e.stopPropagation() if not ((e.ctrlKey and e.keyCode is 32) or e.keyCode in [33, 34])
@@ -262,10 +292,10 @@ class GraphIt
             DX = @dx2DX(@dragging.x - event.clientX)
             DY = @dy2DY(@dragging.y - event.clientY)
 
-            @reg.X.min += DX
-            @reg.X.max += DX
-            @reg.Y.min -= DY
-            @reg.Y.max -= DY
+            @state.reg.X.min += DX
+            @state.reg.X.max += DX
+            @state.reg.Y.min -= DY
+            @state.reg.Y.max -= DY
             @dragging.x = event.clientX
             @dragging.y = event.clientY
             event.stopPropagation()
@@ -281,23 +311,23 @@ class GraphIt
         ).mousewheel((event, delta) =>
             if delta < 0
                 if not event.shiftKey and @mode isnt "y"
-                    @reg.X.zcoef += @step
-                    dx = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.X.zcoef - @step)
+                    @state.reg.X.zcoef += @state.step
+                    dx = (Math.pow(@state.pow, @state.step) - 1) * Math.pow(@state.pow, @state.reg.X.zcoef - @state.step)
                 if not event.altKey and @mode isnt "x"
-                    @reg.Y.zcoef += @step
-                    dy = (Math.pow(@pow, @step) - 1) * Math.pow(@pow, @reg.Y.zcoef - @step)
+                    @state.reg.Y.zcoef += @state.step
+                    dy = (Math.pow(@state.pow, @state.step) - 1) * Math.pow(@state.pow, @state.reg.Y.zcoef - @state.step)
             else
                 if not event.shiftKey and @mode isnt "y"
-                    dx = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.X.zcoef - @step)
-                    @reg.X.zcoef -= @step
+                    dx = (1 - Math.pow(@state.pow, @state.step)) * Math.pow(@state.pow, @state.reg.X.zcoef - @state.step)
+                    @state.reg.X.zcoef -= @state.step
                 if not event.altKey and @mode isnt "x"
-                    dy = (1 - Math.pow(@pow, @step)) * Math.pow(@pow, @reg.Y.zcoef - @step)
-                    @reg.Y.zcoef -= @step
+                    dy = (1 - Math.pow(@state.pow, @state.step)) * Math.pow(@state.pow, @state.reg.Y.zcoef - @state.step)
+                    @state.reg.Y.zcoef -= @state.step
 
-            @reg.X.min -= (2 * dx * event.clientX) / @scr.w
-            @reg.X.max += (2 * dx * (@scr.w - event.clientX)) / @scr.w
-            @reg.Y.min -= (2 * dy * (@scr.h - event.clientY)) / @scr.h
-            @reg.Y.max += (2 * dy * event.clientY) / @scr.h
+            @state.reg.X.min -= (2 * dx * event.clientX) / @scr.w
+            @state.reg.X.max += (2 * dx * (@scr.w - event.clientX)) / @scr.w
+            @state.reg.Y.min -= (2 * dy * (@scr.h - event.clientY)) / @scr.h
+            @state.reg.Y.max += (2 * dy * event.clientY) / @scr.h
             @replot()
             event.stopPropagation()
             false
@@ -311,66 +341,70 @@ class GraphIt
                 @mode = null
 
             if event.keyCode is 82 # r
-                rX = @reg.X.max - @reg.X.min
-                rY = @reg.Y.max - @reg.Y.min
-                @reg.X.min = -rX / 2
-                @reg.X.max = rX / 2
-                @reg.Y.min = -rY / 2
-                @reg.Y.max = rY / 2
+                rX = @state.reg.X.max - @state.reg.X.min
+                rY = @state.reg.Y.max - @state.reg.Y.min
+                @state.reg.X.min = -rX / 2
+                @state.reg.X.max = rX / 2
+                @state.reg.Y.min = -rY / 2
+                @state.reg.Y.max = rY / 2
             else if event.keyCode is 84 # t
-                @reg.X.zcoef = @reg.Y.zcoef = 5
-                nwx = Math.pow(@pow, @reg.X.zcoef)
-                nwy = Math.pow(@pow, @reg.Y.zcoef)
+                @state.reg.X.zcoef = @state.reg.Y.zcoef = 5
+                nwx = Math.pow(@state.pow, @state.reg.X.zcoef)
+                nwy = Math.pow(@state.pow, @state.reg.Y.zcoef)
 
-                @reg.X.min = -nwx
-                @reg.X.max = nwx
-                @reg.Y.min = -nwy
-                @reg.Y.max = nwy
+                @state.reg.X.min = -nwx
+                @state.reg.X.max = nwx
+                @state.reg.Y.min = -nwy
+                @state.reg.Y.max = nwy
             else if event.keyCode is 83 # s
-                $("#theme")[0].href = @themes[++@theme % @themes.length] + ".css"
+                $("#theme")[0].href = @themes[++@state.theme % @themes.length] + ".css"
             else if event.keyCode is 77 # m
-                @polar_range *= 2
+                @state.polar_range *= 2
             else if event.keyCode is 76 # l
-                @polar_range /= 2
+                @state.polar_range /= 2
             else if event.keyCode is 80 # p
-                @polar_step *= 2
+                @state.polar_step *= 2
             else if event.keyCode is 79 # o
-                @polar_step /= 2
+                @state.polar_step /= 2
             else if event.keyCode is 39 # Right
-                w = @reg.X.max - @reg.X.min
-                @reg.X.min += w / 10
-                @reg.X.max += w / 10
+                w = @state.reg.X.max - @state.reg.X.min
+                @state.reg.X.min += w / 10
+                @state.reg.X.max += w / 10
             else if event.keyCode is 37 # Left
-                w = @reg.X.max - @reg.X.min
-                @reg.X.min -= w / 10
-                @reg.X.max -= w / 10
+                w = @state.reg.X.max - @state.reg.X.min
+                @state.reg.X.min -= w / 10
+                @state.reg.X.max -= w / 10
             else if event.keyCode is 38 # Up
-                w = @reg.Y.max - @reg.Y.min
-                @reg.Y.min += w / 10
-                @reg.Y.max += w / 10
+                w = @state.reg.Y.max - @state.reg.Y.min
+                @state.reg.Y.min += w / 10
+                @state.reg.Y.max += w / 10
             else if event.keyCode is 40 # Down
-                w = @reg.Y.max - @reg.Y.min
-                @reg.Y.min -= w / 10
-                @reg.Y.max -= w / 10
+                w = @state.reg.Y.max - @state.reg.Y.min
+                @state.reg.Y.min -= w / 10
+                @state.reg.Y.max -= w / 10
             else if event.ctrlKey and event.keyCode is 32
-                if @functions[@selected].type == 'linear'
-                    @functions[@selected].type = 'polar'
-                else if @functions[@selected].type == 'polar'
-                    @functions[@selected].type = 'horizontal'
-                else if @functions[@selected].type == 'horizontal'
-                    @functions[@selected].type = 'linear'
+                @state.functions[@state.selected].type = @function_types[@state.functions[@state.selected].type].next
                 @updateBox()
                 @replot()
             else if event.keyCode is 33 # PageUp
-                $("#nft").removeClass "line-color-" + @selected
-                @selected++
-                @selected = 0  if @selected > 15
+                $("#nft").removeClass "line-color-" + @state.selected
+                @state.selected++
+                @state.selected = 0  if @state.selected > 15
                 @newSelected()
             else if event.keyCode is 34 # PageUp
-                $("#nft").removeClass "line-color-" + @selected
-                @selected--
-                @selected = 15  if @selected < 0
+                $("#nft").removeClass "line-color-" + @state.selected
+                @state.selected--
+                @state.selected = 15  if @state.selected < 0
                 @newSelected()
+            else if event.keyCode is 46 # Suppr
+                @state = new State()
+                location.hash = ''
+                @updateBox()
+                $("#nft").removeClass "line-color-" + @state.selected
+                $("#ft").val @state.functions[@state.selected].expr
+                $("#ft").trigger 'input'
+            else if event.keyCode is 27 # Escape
+                location.hash = JSON.stringify @state
             else
                 return
             @replot()
@@ -381,22 +415,9 @@ class GraphIt
         @canvas = $canvas.get 0
         @c = @canvas.getContext "2d"
         @size()
-        nwx = Math.pow(@pow, @reg.X.zcoef)
-        nwy = Math.pow(@pow, @reg.Y.zcoef)
-
-        @reg.X.min -= nwx
-        @reg.X.max += nwx
-        @reg.Y.min -= nwy
-        @reg.Y.max += nwy
-
-        for n in [1..15]
-            @functions[n] =
-                expr: ""
-                type: 'linear'
-                error: false
         @updateBox()
 
-        $ft.val @functions[0].expr
+        $ft.val @state.functions[@state.selected].expr
         $ft.trigger 'input'
 
 $ ->
