@@ -99,7 +99,6 @@ class GraphIt
         $("#pft").html @function_types[@state.functions[@state.selected].type].symbol
         $("#nft").addClass "line-color-" + @state.selected
         $("#nft").text @state.selected
-        # $("#var").text(if @state.functions[@state.selected].type is 'horizontal'  then "y" else "x")
 
     prepareFunction: (ftexp) ->
         for f in @Math.functions
