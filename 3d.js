@@ -1,5 +1,5 @@
 (function() {
-  var Box, Camera, Dot, GraphIt, cos, sin,
+  var Box, Camera, Dot, Graph, GraphIt, cos, sin,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   cos = Math.cos;
@@ -11,7 +11,7 @@
     Camera.name = 'Camera';
 
     function Camera() {
-      this.scale = 150;
+      this.scale = 35;
       this.fov = 1.2;
       this.x = window.innerWidth / 2;
       this.y = window.innerHeight / 2;
@@ -60,8 +60,8 @@
 
     Box.name = 'Box';
 
-    function Box() {
-      this.dots = [new Dot(1, 1, 1), new Dot(1, 1, -1), new Dot(1, -1, -1), new Dot(1, -1, 1), new Dot(-1, -1, 1), new Dot(-1, 1, 1), new Dot(-1, 1, -1), new Dot(-1, -1, -1)];
+    function Box(w) {
+      this.dots = [new Dot(w, w, w), new Dot(w, w, -w), new Dot(w, -w, -w), new Dot(w, -w, w), new Dot(-w, -w, w), new Dot(-w, w, w), new Dot(-w, w, -w), new Dot(-w, -w, -w)];
       this.links = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [2, 7], [1, 6], [0, 5], [4, 5], [5, 6], [6, 7], [7, 4]];
     }
 
@@ -94,6 +94,76 @@
 
   })();
 
+  Graph = (function() {
+
+    Graph.name = 'Graph';
+
+    function Graph() {
+      var dots, x, y, z, _i, _j, _k, _l;
+      this.expr = function(x, y) {
+        return cos(x) * sin(y);
+      };
+      this.lines = [];
+      for (y = _i = -5; _i <= 5; y = _i += .5) {
+        dots = [];
+        for (x = _j = -5; _j <= 5; x = _j += .5) {
+          z = this.expr(x, y);
+          dots.push(new Dot(x, y, z));
+        }
+        this.lines.push(dots);
+      }
+      for (x = _k = -5; _k <= 5; x = _k += .5) {
+        dots = [];
+        for (y = _l = -5; _l <= 5; y = _l += .5) {
+          z = this.expr(x, y);
+          dots.push(new Dot(x, y, z));
+        }
+        this.lines.push(dots);
+      }
+    }
+
+    Graph.prototype.render = function(c, camera) {
+      var dot, line, x, y, _i, _j, _len, _len2, _ref, _ref2, _ref3, _results;
+      _ref = this.lines;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        line = _ref[_i];
+        c.beginPath();
+        _ref2 = line[0].project(camera), x = _ref2[0], y = _ref2[1];
+        c.moveTo(x, y);
+        for (_j = 0, _len2 = line.length; _j < _len2; _j++) {
+          dot = line[_j];
+          _ref3 = dot.project(camera), x = _ref3[0], y = _ref3[1];
+          c.lineTo(x, y);
+        }
+        _results.push(c.stroke());
+      }
+      return _results;
+    };
+
+    Graph.prototype.rotate = function(a, b) {
+      var dot, line, _i, _len, _ref, _results;
+      _ref = this.lines;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        line = _ref[_i];
+        _results.push((function() {
+          var _j, _len2, _results2;
+          _results2 = [];
+          for (_j = 0, _len2 = line.length; _j < _len2; _j++) {
+            dot = line[_j];
+            _results2.push(dot.rotate(a, b));
+          }
+          return _results2;
+        })());
+      }
+      return _results;
+    };
+
+    return Graph;
+
+  })();
+
   GraphIt = (function() {
 
     GraphIt.name = 'GraphIt';
@@ -113,7 +183,8 @@
       this.canvas = $("#canvas").get(0);
       this.c = this.canvas.getContext("2d");
       this.camera = new Camera();
-      this.box = new Box();
+      this.box = new Box(5);
+      this.graph = new Graph();
     }
 
     GraphIt.prototype.size = function() {
@@ -127,7 +198,9 @@
       this.c.fillStyle = $(".bg").css("color");
       this.c.strokeStyle = $(".axis").css("color");
       this.c.fillRect(0, 0, this.scr.w, this.scr.h);
-      return this.box.render(this.c, this.camera);
+      this.box.render(this.c, this.camera);
+      this.c.strokeStyle = $(".line-color-0").css("color");
+      return this.graph.render(this.c, this.camera);
     };
 
     GraphIt.prototype.mousedown = function(event) {
@@ -146,6 +219,7 @@
       dx = event.clientX - this.dragging.x;
       dy = this.dragging.y - event.clientY;
       this.box.rotate(4 * Math.PI * dy / this.scr.h, 4 * Math.PI * dx / this.scr.w);
+      this.graph.rotate(4 * Math.PI * dy / this.scr.h, 4 * Math.PI * dx / this.scr.w);
       this.render();
       this.dragging.x = event.clientX;
       this.dragging.y = event.clientY;

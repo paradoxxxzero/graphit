@@ -20,7 +20,7 @@ sin = Math.sin
 
 class Camera
     constructor: ->
-        @scale = 150
+        @scale = 35
         @fov = 1.2
         @x = window.innerWidth / 2
         @y = window.innerHeight / 2
@@ -50,16 +50,16 @@ class Dot
         @x = @x * cb - t * sb
 
 class Box
-    constructor: ->
+    constructor: (w)->
         @dots = [
-            new Dot( 1,  1,  1),
-            new Dot( 1,  1, -1),
-            new Dot( 1, -1, -1),
-            new Dot( 1, -1,  1),
-            new Dot(-1, -1,  1),
-            new Dot(-1,  1,  1),
-            new Dot(-1,  1, -1),
-            new Dot(-1, -1, -1),
+            new Dot( w,  w,  w),
+            new Dot( w,  w, -w),
+            new Dot( w, -w, -w),
+            new Dot( w, -w,  w),
+            new Dot(-w, -w,  w),
+            new Dot(-w,  w,  w),
+            new Dot(-w,  w, -w),
+            new Dot(-w, -w, -w)
         ]
         @links = [
             [0, 1],
@@ -91,6 +91,37 @@ class Box
         for dot in @dots
             dot.rotate(a, b)
 
+class Graph
+    constructor: ->
+        @expr = (x, y) -> cos(x) * sin(y)
+        @lines = []
+        for y in [-5..5] by .5
+            dots = []
+            for x in [-5..5] by .5
+                z = @expr(x, y)
+                dots.push(new Dot(x, y, z))
+            @lines.push(dots)
+        for x in [-5..5] by .5
+            dots = []
+            for y in [-5..5] by .5
+                z = @expr(x, y)
+                dots.push(new Dot(x, y, z))
+            @lines.push(dots)
+
+    render: (c, camera) ->
+        for line in @lines
+            c.beginPath()
+            [x, y] = line[0].project(camera)
+            c.moveTo x, y
+            for dot in line
+                [x, y] = dot.project(camera)
+                c.lineTo x, y
+            c.stroke()
+
+    rotate: (a, b) ->
+        for line in @lines
+            for dot in line
+                dot.rotate(a, b)
 
 class GraphIt
     dragging:
@@ -102,7 +133,8 @@ class GraphIt
         @canvas = $("#canvas").get 0
         @c = @canvas.getContext "2d"
         @camera = new Camera()
-        @box = new Box()
+        @box = new Box(5)
+        @graph = new Graph()
 
     size: ->
         @scr =
@@ -114,6 +146,8 @@ class GraphIt
         @c.strokeStyle = $(".axis").css("color")
         @c.fillRect 0, 0, @scr.w, @scr.h
         @box.render @c, @camera
+        @c.strokeStyle = $(".line-color-0").css("color")
+        @graph.render @c, @camera
 
     mousedown: (event) =>
         @dragging.on = true
@@ -129,8 +163,8 @@ class GraphIt
         dx = event.clientX - @dragging.x
         dy = @dragging.y - event.clientY
         @box.rotate 4 * Math.PI * dy / @scr.h, 4 * Math.PI * dx / @scr.w
+        @graph.rotate 4 * Math.PI * dy / @scr.h, 4 * Math.PI * dx / @scr.w
         @render()
-
         @dragging.x = event.clientX
         @dragging.y = event.clientY
         event.stopPropagation()
