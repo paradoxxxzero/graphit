@@ -1,20 +1,48 @@
 (function() {
-  var Box, Camera, Dot, Graph, GraphIt, cos, sin,
+  var Box, Camera, Dot, Graph, GraphIt, cap, cos, max, min, prepareFunction, region, sin, _Math,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   cos = Math.cos;
 
   sin = Math.sin;
 
+  min = Math.min;
+
+  max = Math.max;
+
+  _Math = {
+    functions: ["abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan"],
+    constants: ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2"]
+  };
+
+  prepareFunction = function(ftexp) {
+    var c, f, _i, _j, _len, _len2, _ref, _ref2, _results;
+    _ref = _Math.functions;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      f = _ref[_i];
+      ftexp = ftexp.replace(new RegExp(f + "\\(", "g"), "Math." + f + "(");
+    }
+    _ref2 = _Math.constants;
+    _results = [];
+    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+      c = _ref2[_j];
+      _results.push(ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c));
+    }
+    return _results;
+  };
+
+  region = 5;
+
+  cap = function(n) {
+    return max(min(n, region), -region);
+  };
+
   Camera = (function() {
 
     Camera.name = 'Camera';
 
     function Camera() {
-      this.scale = 35;
-      this.fov = 1.2;
-      this.x = window.innerWidth / 2;
-      this.y = window.innerHeight / 2;
+      this.fov = 1.1;
       this.z = 500;
     }
 
@@ -32,24 +60,26 @@
       this.z = z;
     }
 
-    Dot.prototype.project = function(camera) {
-      var zoom;
-      zoom = 1 + (this.z * camera.scale) * camera.fov / camera.z;
-      return [camera.x + (this.x * camera.scale) / zoom, camera.y + (this.y * camera.scale) / zoom];
+    Dot.prototype.project = function(camera, rotation) {
+      var scale, x, y, z, zoom, _ref;
+      _ref = this.rotate(rotation.a, rotation.b), x = _ref[0], y = _ref[1], z = _ref[2];
+      scale = min(window.innerWidth, window.innerHeight) / (5 * region);
+      zoom = 1 + (z * scale) * camera.fov / camera.z;
+      return [camera.x + (x * scale) / zoom, camera.y + (y * scale) / zoom];
     };
 
     Dot.prototype.rotate = function(a, b) {
-      var ca, cb, sa, sb, t;
+      var ca, cb, sa, sb, t, x, y, z;
       ca = cos(a);
       sa = sin(a);
       cb = cos(b);
       sb = sin(b);
-      t = this.z;
-      this.z = -this.y * sa + t * ca;
-      this.y = this.y * ca + t * sa;
-      t = this.z;
-      this.z = this.x * sb + t * cb;
-      return this.x = this.x * cb - t * sb;
+      z = -this.y * sa + this.z * ca;
+      y = this.y * ca + this.z * sa;
+      t = z;
+      z = this.x * sb + t * cb;
+      x = this.x * cb - t * sb;
+      return [x, y, z];
     };
 
     return Dot;
@@ -65,29 +95,18 @@
       this.links = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [2, 7], [1, 6], [0, 5], [4, 5], [5, 6], [6, 7], [7, 4]];
     }
 
-    Box.prototype.render = function(c, camera) {
+    Box.prototype.render = function(c, camera, rotation) {
       var d1, d2, x, y, _i, _len, _ref, _ref2, _ref3, _ref4;
       c.beginPath();
       _ref = this.links;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         _ref2 = _ref[_i], d1 = _ref2[0], d2 = _ref2[1];
-        _ref3 = this.dots[d1].project(camera), x = _ref3[0], y = _ref3[1];
+        _ref3 = this.dots[d1].project(camera, rotation), x = _ref3[0], y = _ref3[1];
         c.moveTo(x, y);
-        _ref4 = this.dots[d2].project(camera), x = _ref4[0], y = _ref4[1];
+        _ref4 = this.dots[d2].project(camera, rotation), x = _ref4[0], y = _ref4[1];
         c.lineTo(x, y);
       }
       return c.stroke();
-    };
-
-    Box.prototype.rotate = function(a, b) {
-      var dot, _i, _len, _ref, _results;
-      _ref = this.dots;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        dot = _ref[_i];
-        _results.push(dot.rotate(a, b));
-      }
-      return _results;
     };
 
     return Box;
@@ -98,64 +117,44 @@
 
     Graph.name = 'Graph';
 
-    function Graph() {
-      var dots, x, y, z, _i, _j, _k, _l;
-      this.expr = function(x, y) {
-        return cos(x) * sin(y);
-      };
+    function Graph(expr) {
+      var dots, x, y, z, _i, _j, _k, _l, _ref, _ref2, _ref3, _ref4;
+      this.expr = expr;
+      this.fun = new Function('x', 'y', 'return ' + prepareFunction(expr));
       this.lines = [];
-      for (y = _i = -5; _i <= 5; y = _i += .5) {
+      for (y = _i = -region, _ref = region / 10; -region <= region ? _i <= region : _i >= region; y = _i += _ref) {
         dots = [];
-        for (x = _j = -5; _j <= 5; x = _j += .5) {
-          z = this.expr(x, y);
+        for (x = _j = -region, _ref2 = region / 100; -region <= region ? _j <= region : _j >= region; x = _j += _ref2) {
+          z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }
         this.lines.push(dots);
       }
-      for (x = _k = -5; _k <= 5; x = _k += .5) {
+      for (x = _k = -region, _ref3 = region / 10; -region <= region ? _k <= region : _k >= region; x = _k += _ref3) {
         dots = [];
-        for (y = _l = -5; _l <= 5; y = _l += .5) {
-          z = this.expr(x, y);
+        for (y = _l = -region, _ref4 = region / 100; -region <= region ? _l <= region : _l >= region; y = _l += _ref4) {
+          z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }
         this.lines.push(dots);
       }
     }
 
-    Graph.prototype.render = function(c, camera) {
+    Graph.prototype.render = function(c, camera, rotation) {
       var dot, line, x, y, _i, _j, _len, _len2, _ref, _ref2, _ref3, _results;
       _ref = this.lines;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         line = _ref[_i];
         c.beginPath();
-        _ref2 = line[0].project(camera), x = _ref2[0], y = _ref2[1];
+        _ref2 = line[0].project(camera, rotation), x = _ref2[0], y = _ref2[1];
         c.moveTo(x, y);
         for (_j = 0, _len2 = line.length; _j < _len2; _j++) {
           dot = line[_j];
-          _ref3 = dot.project(camera), x = _ref3[0], y = _ref3[1];
+          _ref3 = dot.project(camera, rotation), x = _ref3[0], y = _ref3[1];
           c.lineTo(x, y);
         }
         _results.push(c.stroke());
-      }
-      return _results;
-    };
-
-    Graph.prototype.rotate = function(a, b) {
-      var dot, line, _i, _len, _ref, _results;
-      _ref = this.lines;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        line = _ref[_i];
-        _results.push((function() {
-          var _j, _len2, _results2;
-          _results2 = [];
-          for (_j = 0, _len2 = line.length; _j < _len2; _j++) {
-            dot = line[_j];
-            _results2.push(dot.rotate(a, b));
-          }
-          return _results2;
-        })());
       }
       return _results;
     };
@@ -174,7 +173,16 @@
       y: 0
     };
 
+    GraphIt.prototype.rotation = {
+      a: .7,
+      b: 0
+    };
+
     function GraphIt() {
+      this.input = __bind(this.input, this);
+
+      this.mousewheel = __bind(this.mousewheel, this);
+
       this.mouseup = __bind(this.mouseup, this);
 
       this.mousemove = __bind(this.mousemove, this);
@@ -183,24 +191,25 @@
       this.canvas = $("#canvas").get(0);
       this.c = this.canvas.getContext("2d");
       this.camera = new Camera();
-      this.box = new Box(5);
-      this.graph = new Graph();
+      this.box = new Box(region);
     }
 
     GraphIt.prototype.size = function() {
-      return this.scr = {
+      this.scr = {
         h: this.canvas.height = window.innerHeight - 25,
         w: this.canvas.width = window.innerWidth
       };
+      this.camera.x = this.scr.w / 2;
+      return this.camera.y = this.scr.h / 2;
     };
 
     GraphIt.prototype.render = function() {
       this.c.fillStyle = $(".bg").css("color");
       this.c.strokeStyle = $(".axis").css("color");
       this.c.fillRect(0, 0, this.scr.w, this.scr.h);
-      this.box.render(this.c, this.camera);
+      this.box.render(this.c, this.camera, this.rotation);
       this.c.strokeStyle = $(".line-color-0").css("color");
-      return this.graph.render(this.c, this.camera);
+      return this.graph.render(this.c, this.camera, this.rotation);
     };
 
     GraphIt.prototype.mousedown = function(event) {
@@ -218,8 +227,8 @@
       if (!this.dragging.on) return;
       dx = event.clientX - this.dragging.x;
       dy = this.dragging.y - event.clientY;
-      this.box.rotate(4 * Math.PI * dy / this.scr.h, 4 * Math.PI * dx / this.scr.w);
-      this.graph.rotate(4 * Math.PI * dy / this.scr.h, 4 * Math.PI * dx / this.scr.w);
+      this.rotation.a += 4 * Math.PI * dy / this.scr.h;
+      this.rotation.b += 4 * Math.PI * dx / this.scr.w;
       this.render();
       this.dragging.x = event.clientX;
       this.dragging.y = event.clientY;
@@ -234,16 +243,38 @@
       return false;
     };
 
+    GraphIt.prototype.mousewheel = function(event, delta) {
+      if (delta < 0) {
+        region *= 1.1;
+      } else {
+        region *= .9;
+      }
+      this.box = new Box(region);
+      this.graph = new Graph(this.graph.expr);
+      return this.render();
+    };
+
+    GraphIt.prototype.input = function(event) {
+      this.box = new Box(region);
+      this.graph = new Graph(event.target.value);
+      return this.render();
+    };
+
     return GraphIt;
 
   })();
 
   $(function() {
-    var graphit;
+    var graphit,
+      _this = this;
     graphit = new GraphIt();
-    $("#canvas").mousedown(graphit.mousedown).mousemove(graphit.mousemove).mouseup(graphit.mouseup);
+    $("#canvas").mousedown(graphit.mousedown).mousemove(graphit.mousemove).mouseup(graphit.mouseup).mousewheel(graphit.mousewheel);
+    $(window).resize(function() {
+      graphit.size();
+      return graphit.render();
+    });
     graphit.size();
-    return graphit.render();
+    return $("#ft").bind('input', graphit.input).val('cos(x) * sin(y)').trigger('input');
   });
 
 }).call(this);
