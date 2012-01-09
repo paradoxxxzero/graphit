@@ -42,7 +42,7 @@
     Camera.name = 'Camera';
 
     function Camera() {
-      this.fov = 1.1;
+      this.fov = .5;
       this.z = 500;
     }
 
@@ -63,7 +63,7 @@
     Dot.prototype.project = function(camera, rotation) {
       var scale, x, y, z, zoom, _ref;
       _ref = this.rotate(rotation.a, rotation.b), x = _ref[0], y = _ref[1], z = _ref[2];
-      scale = min(window.innerWidth, window.innerHeight) / (5 * region);
+      scale = min(window.innerWidth, window.innerHeight) / (3 * region);
       zoom = 1 + (z * scale) * camera.fov / camera.z;
       return [camera.x + (x * scale) / zoom, camera.y + (y * scale) / zoom];
     };
@@ -118,21 +118,32 @@
     Graph.name = 'Graph';
 
     function Graph(expr) {
-      var dots, x, y, z, _i, _j, _k, _l, _ref, _ref2, _ref3, _ref4;
+      var dots, range, x, y, z, _i, _j, _k, _l, _len, _len2, _ref, _ref2;
       this.expr = expr;
       this.fun = new Function('x', 'y', 'return ' + prepareFunction(expr));
       this.lines = [];
-      for (y = _i = -region, _ref = region / 10; -region <= region ? _i <= region : _i >= region; y = _i += _ref) {
+      range = (function() {
+        var _i, _ref, _results;
+        _results = [];
+        for (x = _i = -region, _ref = region / 20; -region <= region ? _i <= region : _i >= region; x = _i += _ref) {
+          _results.push(x);
+        }
+        return _results;
+      })();
+      if (range.slice(-1)[0] !== region) range.push(region);
+      for (_i = 0, _len = range.length; _i < _len; _i++) {
+        y = range[_i];
         dots = [];
-        for (x = _j = -region, _ref2 = region / 100; -region <= region ? _j <= region : _j >= region; x = _j += _ref2) {
+        for (x = _j = -region, _ref = region / 100; -region <= region ? _j <= region : _j >= region; x = _j += _ref) {
           z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }
         this.lines.push(dots);
       }
-      for (x = _k = -region, _ref3 = region / 10; -region <= region ? _k <= region : _k >= region; x = _k += _ref3) {
+      for (_k = 0, _len2 = range.length; _k < _len2; _k++) {
+        x = range[_k];
         dots = [];
-        for (y = _l = -region, _ref4 = region / 100; -region <= region ? _l <= region : _l >= region; y = _l += _ref4) {
+        for (y = _l = -region, _ref2 = region / 100; -region <= region ? _l <= region : _l >= region; y = _l += _ref2) {
           z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }

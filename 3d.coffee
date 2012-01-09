@@ -36,7 +36,7 @@ cap = (n) -> max(min(n, region), -region)
 
 class Camera
     constructor: ->
-        @fov = 1.1
+        @fov = .5
         @z = 500
 
 
@@ -48,7 +48,7 @@ class Dot
 
     project: (camera, rotation) ->
         [x, y, z] = @rotate(rotation.a, rotation.b)
-        scale = min(window.innerWidth, window.innerHeight) / (5 * region)
+        scale = min(window.innerWidth, window.innerHeight) / (3 * region)
         zoom = 1 + (z * scale) * camera.fov / camera.z
         [camera.x + (x * scale) / zoom,
          camera.y + (y * scale) / zoom]
@@ -108,13 +108,16 @@ class Graph
         @expr = expr
         @fun = new Function('x', 'y', 'return ' + prepareFunction(expr))
         @lines = []
-        for y in [-region..region] by region / 10
+        range = (x for x in [-region..region] by region / 20)
+        if range.slice(-1)[0] != region
+            range.push region
+        for y in range
             dots = []
             for x in [-region..region] by region / 100
                 z = cap(@fun x, y)
                 dots.push new Dot(x, y, z)
             @lines.push(dots)
-        for x in [-region..region] by region / 10
+        for x in range
             dots = []
             for y in [-region..region] by region / 100
                 z = cap(@fun x, y)
