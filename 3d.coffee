@@ -104,22 +104,23 @@ class Box
         c.stroke()
 
 class Graph
-    constructor: (expr) ->
+    constructor: (expr, precision, detail) ->
         @expr = expr
         @fun = new Function('x', 'y', 'return ' + prepareFunction(expr))
         @lines = []
-        range = (x for x in [-region..region] by region / 20)
+        range = (x for x in [-region..region] by region / precision)
+        subrange = (x for x in [-region..region] by region / detail)
         if range.slice(-1)[0] != region
             range.push region
         for y in range
             dots = []
-            for x in [-region..region] by region / 100
+            for x in subrange
                 z = cap(@fun x, y)
                 dots.push new Dot(x, y, z)
             @lines.push(dots)
         for x in range
             dots = []
-            for y in [-region..region] by region / 100
+            for y in subrange
                 z = cap(@fun x, y)
                 dots.push new Dot(x, y, z)
             @lines.push(dots)
@@ -145,6 +146,8 @@ class GraphIt
         b: 0
 
     constructor: ->
+        @precision = 20
+        @detail = 100
         @canvas = $("#canvas").get 0
         @c = @canvas.getContext "2d"
         @camera = new Camera()
@@ -165,6 +168,36 @@ class GraphIt
         @c.strokeStyle = $(".line-color-0").css("color")
         @graph.render @c, @camera, @rotation
 
+    keydown: (event) =>
+        step = .1
+        if event.keyCode == 39
+            @rotation.b += step
+        else if event.keyCode == 37
+            @rotation.b -= step
+        else if event.keyCode == 38
+            @rotation.a += step
+        else if event.keyCode == 40
+            @rotation.a -= step
+        else if event.keyCode == 33
+            @camera.fov += step
+        else if event.keyCode == 34
+            @camera.fov -= step
+        else if event.keyCode == 77
+            @precision *= 1.2
+            @regraph()
+        else if event.keyCode == 76
+            @precision *= .8
+            @regraph()
+        else if event.keyCode == 80
+            @detail *= 1.2
+            @regraph()
+        else if event.keyCode == 79
+            @detail *= .8
+            @regraph()
+
+        @render()
+
+
     mousedown: (event) =>
         @dragging.on = true
         @dragging.x = event.clientX
@@ -178,8 +211,8 @@ class GraphIt
         return unless @dragging.on
         dx = event.clientX - @dragging.x
         dy = @dragging.y - event.clientY
-        @rotation.a += 4 * Math.PI * dy / @scr.h
-        @rotation.b += 4 * Math.PI * dx / @scr.w
+        @rotation.a += Math.PI * dy / @scr.h
+        @rotation.b += Math.PI * dx / @scr.w
         @render()
         @dragging.x = event.clientX
         @dragging.y = event.clientY
@@ -197,14 +230,16 @@ class GraphIt
             region *= 1.1
         else
             region *= .9
+        @regraph()
 
+    regraph: ->
         @box = new Box(region)
-        @graph = new Graph(@graph.expr)
+        @graph = new Graph(@graph.expr, @precision, @detail)
         @render()
 
     input: (event) =>
         @box = new Box(region)
-        @graph = new Graph(event.target.value)
+        @graph = new Graph(event.target.value, @precision, @detail)
         @render()
 $ ->
     graphit = new GraphIt()
@@ -213,9 +248,11 @@ $ ->
         .mousemove(graphit.mousemove)
         .mouseup(graphit.mouseup)
         .mousewheel(graphit.mousewheel)
-    $(window).resize =>
-        graphit.size()
-        graphit.render()
+    $(window)
+        .keydown(graphit.keydown)
+        .resize =>
+            graphit.size()
+            graphit.render()
     graphit.size()
     $("#ft")
         .bind('input', graphit.input)

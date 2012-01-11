@@ -117,15 +117,23 @@
 
     Graph.name = 'Graph';
 
-    function Graph(expr) {
-      var dots, range, x, y, z, _i, _j, _k, _l, _len, _len2, _ref, _ref2;
+    function Graph(expr, precision, detail) {
+      var dots, range, subrange, x, y, z, _i, _j, _k, _l, _len, _len2, _len3, _len4;
       this.expr = expr;
       this.fun = new Function('x', 'y', 'return ' + prepareFunction(expr));
       this.lines = [];
       range = (function() {
         var _i, _ref, _results;
         _results = [];
-        for (x = _i = -region, _ref = region / 20; -region <= region ? _i <= region : _i >= region; x = _i += _ref) {
+        for (x = _i = -region, _ref = region / precision; -region <= region ? _i <= region : _i >= region; x = _i += _ref) {
+          _results.push(x);
+        }
+        return _results;
+      })();
+      subrange = (function() {
+        var _i, _ref, _results;
+        _results = [];
+        for (x = _i = -region, _ref = region / detail; -region <= region ? _i <= region : _i >= region; x = _i += _ref) {
           _results.push(x);
         }
         return _results;
@@ -134,16 +142,18 @@
       for (_i = 0, _len = range.length; _i < _len; _i++) {
         y = range[_i];
         dots = [];
-        for (x = _j = -region, _ref = region / 100; -region <= region ? _j <= region : _j >= region; x = _j += _ref) {
+        for (_j = 0, _len2 = subrange.length; _j < _len2; _j++) {
+          x = subrange[_j];
           z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }
         this.lines.push(dots);
       }
-      for (_k = 0, _len2 = range.length; _k < _len2; _k++) {
+      for (_k = 0, _len3 = range.length; _k < _len3; _k++) {
         x = range[_k];
         dots = [];
-        for (y = _l = -region, _ref2 = region / 100; -region <= region ? _l <= region : _l >= region; y = _l += _ref2) {
+        for (_l = 0, _len4 = subrange.length; _l < _len4; _l++) {
+          y = subrange[_l];
           z = cap(this.fun(x, y));
           dots.push(new Dot(x, y, z));
         }
@@ -199,6 +209,10 @@
       this.mousemove = __bind(this.mousemove, this);
 
       this.mousedown = __bind(this.mousedown, this);
+
+      this.keydown = __bind(this.keydown, this);
+      this.precision = 20;
+      this.detail = 100;
       this.canvas = $("#canvas").get(0);
       this.c = this.canvas.getContext("2d");
       this.camera = new Camera();
@@ -223,6 +237,37 @@
       return this.graph.render(this.c, this.camera, this.rotation);
     };
 
+    GraphIt.prototype.keydown = function(event) {
+      var step;
+      step = .1;
+      if (event.keyCode === 39) {
+        this.rotation.b += step;
+      } else if (event.keyCode === 37) {
+        this.rotation.b -= step;
+      } else if (event.keyCode === 38) {
+        this.rotation.a += step;
+      } else if (event.keyCode === 40) {
+        this.rotation.a -= step;
+      } else if (event.keyCode === 33) {
+        this.camera.fov += step;
+      } else if (event.keyCode === 34) {
+        this.camera.fov -= step;
+      } else if (event.keyCode === 77) {
+        this.precision *= 1.2;
+        this.regraph();
+      } else if (event.keyCode === 76) {
+        this.precision *= .8;
+        this.regraph();
+      } else if (event.keyCode === 80) {
+        this.detail *= 1.2;
+        this.regraph();
+      } else if (event.keyCode === 79) {
+        this.detail *= .8;
+        this.regraph();
+      }
+      return this.render();
+    };
+
     GraphIt.prototype.mousedown = function(event) {
       this.dragging.on = true;
       this.dragging.x = event.clientX;
@@ -238,8 +283,8 @@
       if (!this.dragging.on) return;
       dx = event.clientX - this.dragging.x;
       dy = this.dragging.y - event.clientY;
-      this.rotation.a += 4 * Math.PI * dy / this.scr.h;
-      this.rotation.b += 4 * Math.PI * dx / this.scr.w;
+      this.rotation.a += Math.PI * dy / this.scr.h;
+      this.rotation.b += Math.PI * dx / this.scr.w;
       this.render();
       this.dragging.x = event.clientX;
       this.dragging.y = event.clientY;
@@ -260,14 +305,18 @@
       } else {
         region *= .9;
       }
+      return this.regraph();
+    };
+
+    GraphIt.prototype.regraph = function() {
       this.box = new Box(region);
-      this.graph = new Graph(this.graph.expr);
+      this.graph = new Graph(this.graph.expr, this.precision, this.detail);
       return this.render();
     };
 
     GraphIt.prototype.input = function(event) {
       this.box = new Box(region);
-      this.graph = new Graph(event.target.value);
+      this.graph = new Graph(event.target.value, this.precision, this.detail);
       return this.render();
     };
 
@@ -280,7 +329,7 @@
       _this = this;
     graphit = new GraphIt();
     $("#canvas").mousedown(graphit.mousedown).mousemove(graphit.mousemove).mouseup(graphit.mouseup).mousewheel(graphit.mousewheel);
-    $(window).resize(function() {
+    $(window).keydown(graphit.keydown).resize(function() {
       graphit.size();
       return graphit.render();
     });
