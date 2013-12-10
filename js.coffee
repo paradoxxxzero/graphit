@@ -37,12 +37,12 @@ class State
         @parametric_step = .1
         @reg =
             X:
-                min: -Math.pow(@pow, 5)
-                max: Math.pow(@pow, 5)
+                min: -pow(@pow, 5)
+                max: pow(@pow, 5)
                 zcoef: 5
             Y:
-                min: -Math.pow(@pow, 5)
-                max: Math.pow(@pow, 5)
+                min: -pow(@pow, 5)
+                max: pow(@pow, 5)
                 zcoef: 5
             tickSize: 5
 
@@ -67,10 +67,6 @@ class GraphIt
         on: false
         x: 0
         y: 0
-
-    Math:
-        functions: [ "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan" ]
-        constants: [ "E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2" ]
 
     size: ->
         @scr =
@@ -101,10 +97,6 @@ class GraphIt
         $("#nft").text @state.selected
 
     prepareFunction: (ftexp) ->
-        for f in @Math.functions
-            ftexp = ftexp.replace(new RegExp(f + "\\(", "g"), "Math." + f + "(")
-        for c in @Math.constants
-            ftexp = ftexp.replace(new RegExp("@" + c, "g"), "Math." + c)
         ftexp.split ';'
 
     newSelected: ->
@@ -146,11 +138,11 @@ class GraphIt
 
     polar: (funct, f) ->
         lineNext = false
-        for o in [0..@state.polar_range * Math.PI] by Math.PI / @state.polar_step
+        for o in [0..@state.polar_range * pi] by pi / @state.polar_step
             r = funct[0](o)
             if isFinite(r)
-                X = r * Math.cos(o)
-                Y = r * Math.sin(o)
+                X = r * cos(o)
+                Y = r * sin(o)
                 x = @X2x(X)
                 y = @Y2y(Y)
                 if lineNext
@@ -199,8 +191,8 @@ class GraphIt
         @c.fillStyle = $(".bg").css("color")
         @c.strokeStyle = $(".axis").css("color")
         @c.fillRect 0, 0, @scr.w, @scr.h
-        xX0 = Math.min(Math.max(@X2x(0), 0), @scr.w)
-        yY0 = Math.min(Math.max(@Y2y(0), 0), @scr.h)
+        xX0 = min(max(@X2x(0), 0), @scr.w)
+        yY0 = min(max(@Y2y(0), 0), @scr.h)
         isRight = xX0 > @scr.w / 2
         isBottom = yY0 > @scr.h / 2
         @c.beginPath()
@@ -216,16 +208,16 @@ class GraphIt
             Y: @state.reg.Y.max - @state.reg.Y.min
 
         order =
-            X: Math.floor(Math.log(range.X) / Math.log(10))
-            Y: Math.floor(Math.log(range.Y) / Math.log(10))
+            X: floor(log(range.X) / log(10))
+            Y: floor(log(range.Y) / log(10))
 
         ten =
-            X: Math.pow(10, order.X)
-            Y: Math.pow(10, order.Y)
+            X: pow(10, order.X)
+            Y: pow(10, order.Y)
 
         fixrange =
-            X: Math.abs(Math.ceil(Math.log(1 / ten.X) / Math.log(10)))
-            Y: Math.abs(Math.ceil(Math.log(1 / ten.Y) / Math.log(10)))
+            X: abs(ceil(log(1 / ten.X) / log(10)))
+            Y: abs(ceil(log(1 / ten.Y) / log(10)))
 
         if range.X < 2.5 * ten.X
             ten.X *= .25
@@ -240,12 +232,12 @@ class GraphIt
             fixrange.Y++
             ten.Y *= .5
         min =
-            X: Math.floor(@state.reg.X.min / ten.X) * ten.X
-            Y: Math.floor(@state.reg.Y.min / ten.Y) * ten.Y
+            X: floor(@state.reg.X.min / ten.X) * ten.X
+            Y: floor(@state.reg.Y.min / ten.Y) * ten.Y
 
         max =
-            X: Math.floor(@state.reg.X.max / ten.X) * ten.X
-            Y: Math.floor(@state.reg.Y.max / ten.Y) * ten.Y
+            X: floor(@state.reg.X.max / ten.X) * ten.X
+            Y: floor(@state.reg.Y.max / ten.Y) * ten.Y
 
         for s in [min.X..max.X] by ten.X
             x = @X2x(s)
@@ -256,7 +248,7 @@ class GraphIt
                 @c.fillText st, x - 3, yY0 + (1.5 * @state.reg.tickSize + (if isBottom then 2 else 10)) * (if isBottom then -1 else 1)
         for s in [min.Y..max.Y] by ten.X
             y = @Y2y(s)
-            st = (if Math.abs(ten.Y) < 1 then s.toFixed(fixrange.Y) else s)
+            st = (if abs(ten.Y) < 1 then s.toFixed(fixrange.Y) else s)
             unless parseFloat(st) is 0
                 @c.moveTo xX0 + (if isRight then 0 else @state.reg.tickSize), y
                 @c.lineTo xX0 - (if isRight then @state.reg.tickSize else 0), y
@@ -311,16 +303,16 @@ class GraphIt
             if delta < 0
                 if not event.shiftKey and @mode isnt "y"
                     @state.reg.X.zcoef += @state.step
-                    dx = (Math.pow(@state.pow, @state.step) - 1) * Math.pow(@state.pow, @state.reg.X.zcoef - @state.step)
+                    dx = (pow(@state.pow, @state.step) - 1) * pow(@state.pow, @state.reg.X.zcoef - @state.step)
                 if not event.altKey and @mode isnt "x"
                     @state.reg.Y.zcoef += @state.step
-                    dy = (Math.pow(@state.pow, @state.step) - 1) * Math.pow(@state.pow, @state.reg.Y.zcoef - @state.step)
+                    dy = (pow(@state.pow, @state.step) - 1) * pow(@state.pow, @state.reg.Y.zcoef - @state.step)
             else
                 if not event.shiftKey and @mode isnt "y"
-                    dx = (1 - Math.pow(@state.pow, @state.step)) * Math.pow(@state.pow, @state.reg.X.zcoef - @state.step)
+                    dx = (1 - pow(@state.pow, @state.step)) * pow(@state.pow, @state.reg.X.zcoef - @state.step)
                     @state.reg.X.zcoef -= @state.step
                 if not event.altKey and @mode isnt "x"
-                    dy = (1 - Math.pow(@state.pow, @state.step)) * Math.pow(@state.pow, @state.reg.Y.zcoef - @state.step)
+                    dy = (1 - pow(@state.pow, @state.step)) * pow(@state.pow, @state.reg.Y.zcoef - @state.step)
                     @state.reg.Y.zcoef -= @state.step
 
             @state.reg.X.min -= (2 * dx * event.clientX) / @scr.w
@@ -348,8 +340,8 @@ class GraphIt
                 @state.reg.Y.max = rY / 2
             else if event.keyCode is 84 # t
                 @state.reg.X.zcoef = @state.reg.Y.zcoef = 5
-                nwx = Math.pow(@state.pow, @state.reg.X.zcoef)
-                nwy = Math.pow(@state.pow, @state.reg.Y.zcoef)
+                nwx = pow(@state.pow, @state.reg.X.zcoef)
+                nwy = pow(@state.pow, @state.reg.Y.zcoef)
 
                 @state.reg.X.min = -nwx
                 @state.reg.X.max = nwx
@@ -421,3 +413,11 @@ class GraphIt
 
 $ ->
     graphit = new GraphIt()
+
+
+# Horrible hack to get rid of the math module:
+for key in [
+    'abs', 'acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'exp', 'floor',
+    'log', 'max', 'min', 'pow', 'random', 'round', 'sin', 'sqrt', 'tan',
+    'E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'PI', 'SQRT1_2', 'SQRT2']
+    window[key.toLowerCase()] = Math[key]
