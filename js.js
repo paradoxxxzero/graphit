@@ -254,7 +254,7 @@
     };
 
     GraphIt.prototype.replot = function() {
-      var fixrange, isBottom, isRight, max, min, order, range, s, st, ten, x, xX0, y, yY0, _i, _j, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
+      var fixrange, isBottom, isRight, maxima, minima, order, range, s, st, ten, x, xX0, y, yY0, _i, _j, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
       this.c.fillStyle = $(".bg").css("color");
       this.c.strokeStyle = $(".axis").css("color");
       this.c.fillRect(0, 0, this.scr.w, this.scr.h);
@@ -300,15 +300,15 @@
         fixrange.Y++;
         ten.Y *= .5;
       }
-      min = {
+      minima = {
         X: floor(this.state.reg.X.min / ten.X) * ten.X,
         Y: floor(this.state.reg.Y.min / ten.Y) * ten.Y
       };
-      max = {
+      maxima = {
         X: floor(this.state.reg.X.max / ten.X) * ten.X,
         Y: floor(this.state.reg.Y.max / ten.Y) * ten.Y
       };
-      for (s = _i = _ref = min.X, _ref1 = max.X, _ref2 = ten.X; _ref2 > 0 ? _i <= _ref1 : _i >= _ref1; s = _i += _ref2) {
+      for (s = _i = _ref = minima.X, _ref1 = maxima.X, _ref2 = ten.X; _ref2 > 0 ? _i <= _ref1 : _i >= _ref1; s = _i += _ref2) {
         x = this.X2x(s);
         st = (ten.X < 1 ? s.toFixed(fixrange.X) : s);
         if (parseFloat(st) !== 0) {
@@ -317,7 +317,7 @@
           this.c.fillText(st, x - 3, yY0 + (1.5 * this.state.reg.tickSize + (isBottom ? 2 : 10)) * (isBottom ? -1 : 1));
         }
       }
-      for (s = _j = _ref3 = min.Y, _ref4 = max.Y, _ref5 = ten.X; _ref5 > 0 ? _j <= _ref4 : _j >= _ref4; s = _j += _ref5) {
+      for (s = _j = _ref3 = minima.Y, _ref4 = maxima.Y, _ref5 = ten.X; _ref5 > 0 ? _j <= _ref4 : _j >= _ref4; s = _j += _ref5) {
         y = this.Y2y(s);
         st = (abs(ten.Y) < 1 ? s.toFixed(fixrange.Y) : s);
         if (parseFloat(st) !== 0) {
@@ -525,7 +525,7 @@
     return graphit = new GraphIt();
   });
 
-  _ref = ["abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan", "E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2"];
+  _ref = ['abs', 'acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'exp', 'floor', 'log', 'max', 'min', 'pow', 'random', 'round', 'sin', 'sqrt', 'tan', 'E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'PI', 'SQRT1_2', 'SQRT2'];
   for (_i = 0, _len = _ref.length; _i < _len; _i++) {
     key = _ref[_i];
     window[key.toLowerCase()] = Math[key];

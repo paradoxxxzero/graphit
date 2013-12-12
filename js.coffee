@@ -231,22 +231,22 @@ class GraphIt
         else if range.Y < 5 * ten.Y
             fixrange.Y++
             ten.Y *= .5
-        min =
+        minima =
             X: floor(@state.reg.X.min / ten.X) * ten.X
             Y: floor(@state.reg.Y.min / ten.Y) * ten.Y
 
-        max =
+        maxima =
             X: floor(@state.reg.X.max / ten.X) * ten.X
             Y: floor(@state.reg.Y.max / ten.Y) * ten.Y
 
-        for s in [min.X..max.X] by ten.X
+        for s in [minima.X..maxima.X] by ten.X
             x = @X2x(s)
             st = (if ten.X < 1 then s.toFixed(fixrange.X) else s)
             unless parseFloat(st) is 0
                 @c.moveTo x, yY0 - (if isBottom then @state.reg.tickSize else 0)
                 @c.lineTo x, yY0 + (if isBottom then 0 else @state.reg.tickSize)
                 @c.fillText st, x - 3, yY0 + (1.5 * @state.reg.tickSize + (if isBottom then 2 else 10)) * (if isBottom then -1 else 1)
-        for s in [min.Y..max.Y] by ten.X
+        for s in [minima.Y..maxima.Y] by ten.X
             y = @Y2y(s)
             st = (if abs(ten.Y) < 1 then s.toFixed(fixrange.Y) else s)
             unless parseFloat(st) is 0
