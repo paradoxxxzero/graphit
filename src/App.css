@@ -1,0 +1,28 @@
+.App {
+  min-width: 100vw;
+  min-height: 100vh;
+}
+
+.function {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  height: 25px;
+  width: 100%;
+  font-size: 0.75em;
+  text-align: center;
+  display: flex;
+}
+.function input {
+  margin: 0 0.5em;
+  font-size: 1.5em;
+  font-family: monospace;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: none;
+  outline: none;
+}
+.function input.error {
+  color: orangered;
+}

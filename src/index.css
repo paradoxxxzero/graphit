@@ -1,0 +1,10 @@
+body {
+  background: black;
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  color: white;
+  min-width: 100vw;
+  min-height: 100vh;
+}
