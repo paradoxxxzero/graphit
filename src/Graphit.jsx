@@ -320,8 +320,8 @@ export function Graphit({ fun, theme, onError }) {
         }
         const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
 
-        const dx = di2dx(i)
-        const dy = dj2dy(-j)
+        const dx = di2dx(i * window.devicePixelRatio)
+        const dy = dj2dy(-j * window.devicePixelRatio)
 
         setRegion([
           [xmin - dx, xmax - dx],
@@ -334,34 +334,49 @@ export function Graphit({ fun, theme, onError }) {
             ]
           : memo
       },
-      onPinch: ({ origin: [i, j], da: [d, a], touches, first, memo }) => {
+      onPinch: ({ origin, da: [d, a], touches, first, memo }) => {
+        const canvas = canvasRef.current
         if (!first && touches > 2) {
-          memo[3] = false
+          memo[4] = false
         }
-        const [[xmin, xmax], [ymin, ymax], od, constraint] = first
-          ? [...region, d, true]
+        const [[xmin, xmax], [ymin, ymax], od, [i, j], constraint] = first
+          ? [...region, d, origin, true]
           : memo
-        const dd = d - od
+        const dd = (d - od) * window.devicePixelRatio * 2
+
+        let ddx, ddy
         if (constraint) {
-          a = Math.PI / 4
+          ddy = dd
+          ddx = (ddy * canvas.width) / canvas.height
         } else {
           a = (-a + 90 + 360) % 180
           a = (a * Math.PI) / 180
+          ddx = dd * Math.abs(Math.cos(a))
+          ddy = dd * Math.abs(Math.sin(a))
         }
-        const ddx = dd * Math.abs(Math.cos(a))
-        const ddy = dd * Math.abs(Math.sin(a))
+        console.log(ddy > canvas.height)
 
-        const canvas = canvasRef.current
-        const dx = di2dx(ddx)
-        const dy = dj2dy(ddy)
-        const dxmin = lerp(0, dx, i / canvas.width)
-        const dymin = lerp(0, dy, j / canvas.height)
+        // FIXME
+        const dx = di2dx(Math.min(ddx, canvas.width - 1))
+        const dy = dj2dy(Math.min(ddy, canvas.height - 1))
+        const dxmin = lerp(
+          0,
+          dx,
+          clamp((i * window.devicePixelRatio) / canvas.width, 0, 1)
+        )
+        const dymin = lerp(
+          0,
+          dy,
+          clamp((j * window.devicePixelRatio) / canvas.height, 0, 1)
+        )
         setRegion([
           [xmin + dxmin, xmax - (dx - dxmin)],
           [ymin + (dy - dymin), ymax - dymin],
         ])
 
-        return first ? [[xmin, xmax], [ymin, ymax], od, constraint] : memo
+        return first
+          ? [[xmin, xmax], [ymin, ymax], od, origin, constraint]
+          : memo
       },
       onWheel: ({ movement: [, dj], first, memo, event, altKey, shiftKey }) => {
         const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
