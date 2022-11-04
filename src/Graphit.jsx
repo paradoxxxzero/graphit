@@ -206,7 +206,6 @@ export function Graphit({ fun, theme, onError }) {
           if (i === 0 || skipNext) ctx.moveTo(i, j)
           else ctx.lineTo(i, j)
           skipNext = false
-          // skipNext = j < 0 || j > canvas.height
         }
       } else if (type === 'linear-horizontal') {
         for (let j = 0; j < canvas.height; j += PRECISION) {
