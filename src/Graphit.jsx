@@ -183,7 +183,7 @@ export function Graphit({ fun, theme, onError }) {
           throw new Error('Invalid function')
         }
       } catch (e) {
-        console.error(e)
+        console.warn(e)
         error = e.message
         return
       }
@@ -194,7 +194,7 @@ export function Graphit({ fun, theme, onError }) {
           try {
             y = plotter(x)
           } catch (e) {
-            console.error(e)
+            console.warn(e)
             error = e.message
             return
           }
@@ -203,9 +203,10 @@ export function Graphit({ fun, theme, onError }) {
             skipNext = true
             continue
           }
-          if (i === 0 || skipNext) ctx.moveTo(i, j)
+          if (i === 0 || (skipNext && (j < 0 || j > canvas.height)))
+            ctx.moveTo(i, j)
           else ctx.lineTo(i, j)
-          skipNext = false
+          skipNext = j < 0 || j > canvas.height
         }
       } else if (type === 'linear-horizontal') {
         for (let j = 0; j < canvas.height; j += PRECISION) {
@@ -214,14 +215,16 @@ export function Graphit({ fun, theme, onError }) {
           try {
             x = plotter(y)
           } catch (e) {
-            console.error(e)
+            console.warn(e)
             error = e.message
             return
           }
           const i = x2i(x)
 
-          if (j === 0) ctx.moveTo(i, j)
+          if (j === 0 || (skipNext && (i < 0 || i > canvas.width)))
+            ctx.moveTo(i, j)
           else ctx.lineTo(i, j)
+          skipNext = i < 0 || i > canvas.width
         }
       } else if (type === 'polar') {
         for (let o = 0; o < POLAR_MAX; o += POLAR_PRECISION) {
@@ -229,7 +232,7 @@ export function Graphit({ fun, theme, onError }) {
           try {
             r = plotter(o)
           } catch (e) {
-            console.error(e)
+            console.warn(e)
             error = e.message
             return
           }
@@ -248,7 +251,7 @@ export function Graphit({ fun, theme, onError }) {
             x = plotter[0](t)
             y = plotter[1](t)
           } catch (e) {
-            console.error(e)
+            console.warn(e)
             error = e.message
             return
           }
