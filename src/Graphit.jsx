@@ -7,11 +7,18 @@ import {
   useState,
 } from 'react'
 import './Graphit.css'
-import { lerp } from './utils'
+import { lerp, clamp, orderRange } from './utils'
 
-export function Graphit({ fun, color, bgColor, onError }) {
+const PRECISION = 1
+const POLAR_MAX = 2 * Math.PI
+const POLAR_PRECISION = POLAR_MAX / 1028
+const PARAMETRIC_MAX = 10
+const PARAMETRIC_PRECISION = PARAMETRIC_MAX / 512
+const TICK_SIZE = 10
+const MIN_TICK = 200
+
+export function Graphit({ fun, theme, onError }) {
   const canvasRef = useRef(null)
-  const [step, setStep] = useState(1)
   const [region, setRegion] = useState(null)
 
   const i2x = useCallback(
@@ -58,12 +65,30 @@ export function Graphit({ fun, color, bgColor, onError }) {
     [region]
   )
 
+  const dx2di = useCallback(
+    dx => {
+      const { width } = canvasRef.current
+      const [[xmin, xmax]] = region
+      return (dx * width) / (xmax - xmin)
+    },
+    [region]
+  )
+
   const dj2dy = useCallback(
     dj => {
       const { height } = canvasRef.current
       const [, [ymin, ymax]] = region
 
       return (dj * (ymax - ymin)) / height
+    },
+    [region]
+  )
+
+  const dy2dj = useCallback(
+    dy => {
+      const { height } = canvasRef.current
+      const [, [ymin, ymax]] = region
+      return (dy * height) / (ymax - ymin)
     },
     [region]
   )
@@ -75,47 +100,193 @@ export function Graphit({ fun, color, bgColor, onError }) {
     // console.log(...region)
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
+    const [[xmin, xmax], [ymin, ymax]] = region
 
-    ctx.fillStyle = bgColor
+    // Clear background
+    ctx.fillStyle = theme.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    ctx.strokeStyle = color
+    // Draw axes
+    ctx.strokeStyle = theme.axis
     ctx.beginPath()
-    let plotter
-    try {
-      // eslint-disable-next-line no-new-func
-      plotter = new Function('x', 'return ' + fun)
-    } catch (e) {
-      console.error(e)
-      onError(e)
-      return
-    }
+    ctx.moveTo(clamp(x2i(0), 0, canvas.width), 0)
+    ctx.lineTo(clamp(x2i(0), 0, canvas.width), canvas.height)
+    ctx.moveTo(0, clamp(y2j(0), 0, canvas.height))
+    ctx.lineTo(canvas.width, clamp(y2j(0), 0, canvas.height))
+    ctx.stroke()
 
-    for (let i = 0; i < canvas.width; i += step) {
-      const x = i2x(i)
-      let y
-      try {
-        y = plotter(x)
-      } catch (e) {
-        console.error(e)
-        onError(e)
-        return
-      }
+    // Draw ticks
+    ctx.strokeStyle = theme.tick
+    ctx.fillStyle = theme.foreground
+    ctx.beginPath()
+
+    const xTick = orderRange(xmin, xmax, dx2di, MIN_TICK)
+
+    for (let x = xTick.min; x < xTick.max; x += xTick.step) {
+      const i = x2i(x)
+      const j = y2j(0)
+
+      ctx.moveTo(i, j)
+      ctx.lineTo(i, j + TICK_SIZE)
+      ctx.fillText(
+        xTick.precision ? x.toFixed(xTick.precision) : x,
+        i,
+        j + TICK_SIZE * 2
+      )
+    }
+    const yTick = orderRange(ymin, ymax, dy2dj, MIN_TICK)
+
+    for (let y = yTick.min; y < yTick.max; y += yTick.step) {
+      const i = x2i(0)
       const j = y2j(y)
 
-      if (i === 0) ctx.moveTo(i, j)
-      else ctx.lineTo(i, j)
+      ctx.moveTo(i + TICK_SIZE, j)
+      ctx.lineTo(i, j)
+      ctx.fillText(
+        yTick.precision ? y.toFixed(yTick.precision) : y,
+        i + TICK_SIZE * 2,
+        j
+      )
     }
-
     ctx.stroke()
-    onError()
+
+    let error = ''
+
+    fun.split(';').forEach((fun, i) => {
+      ctx.strokeStyle = theme.colors[i]
+      ctx.beginPath()
+      let plotter, type, match, skipNext
+      try {
+        if ((match = fun.match(/^\s*y\s*=\s*(.+)/))) {
+          type = 'linear'
+          // eslint-disable-next-line no-new-func
+          plotter = new Function('x', 'return ' + match[1])
+        } else if ((match = fun.match(/^\s*x\s*=\s*(.+)/))) {
+          type = 'linear-horizontal'
+          // eslint-disable-next-line no-new-func
+          plotter = new Function('y', 'return ' + match[1])
+        } else if ((match = fun.match(/^\s*r\s*=\s*(.+)/))) {
+          type = 'polar'
+          // eslint-disable-next-line no-new-func
+          plotter = new Function('o', 'return ' + match[1])
+        } else if (
+          (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)}/))
+        ) {
+          type = 'parametric'
+          plotter = [
+            // eslint-disable-next-line no-new-func
+            new Function('t', 'return ' + match[1]),
+            // eslint-disable-next-line no-new-func
+            new Function('t', 'return ' + match[2]),
+          ]
+        } else {
+          throw new Error('Invalid function')
+        }
+      } catch (e) {
+        console.error(e)
+        error = e.message
+        return
+      }
+      if (type === 'linear') {
+        for (let i = 0; i < canvas.width; i += PRECISION) {
+          const x = i2x(i)
+          let y
+          try {
+            y = plotter(x)
+          } catch (e) {
+            console.error(e)
+            error = e.message
+            return
+          }
+          const j = y2j(y)
+          if (!isFinite(y)) {
+            skipNext = true
+            continue
+          }
+          if (i === 0 || skipNext) ctx.moveTo(i, j)
+          else ctx.lineTo(i, j)
+          skipNext = false
+          // skipNext = j < 0 || j > canvas.height
+        }
+      } else if (type === 'linear-horizontal') {
+        for (let j = 0; j < canvas.height; j += PRECISION) {
+          const y = j2y(j)
+          let x
+          try {
+            x = plotter(y)
+          } catch (e) {
+            console.error(e)
+            error = e.message
+            return
+          }
+          const i = x2i(x)
+
+          if (j === 0) ctx.moveTo(i, j)
+          else ctx.lineTo(i, j)
+        }
+      } else if (type === 'polar') {
+        for (let o = 0; o < POLAR_MAX; o += POLAR_PRECISION) {
+          let r
+          try {
+            r = plotter(o)
+          } catch (e) {
+            console.error(e)
+            error = e.message
+            return
+          }
+          const x = r * Math.cos(o)
+          const y = r * Math.sin(o)
+          const i = x2i(x)
+          const j = y2j(y)
+
+          if (o === 0) ctx.moveTo(i, j)
+          else ctx.lineTo(i, j)
+        }
+      } else if (type === 'parametric') {
+        for (let t = 0; t < PARAMETRIC_MAX; t += PARAMETRIC_PRECISION) {
+          let x, y
+          try {
+            x = plotter[0](t)
+            y = plotter[1](t)
+          } catch (e) {
+            console.error(e)
+            error = e.message
+            return
+          }
+          const i = x2i(x)
+          const j = y2j(y)
+
+          if (t === 0) ctx.moveTo(i, j)
+          else ctx.lineTo(i, j)
+        }
+      }
+
+      ctx.stroke()
+    })
+    onError(error)
     return true
-  }, [region, bgColor, color, onError, fun, step, i2x, y2j])
+  }, [
+    region,
+    theme.background,
+    theme.axis,
+    theme.tick,
+    theme.foreground,
+    theme.colors,
+    x2i,
+    y2j,
+    dx2di,
+    dy2dj,
+    fun,
+    onError,
+    i2x,
+    j2y,
+  ])
 
   const size = useCallback(() => {
     const canvas = canvasRef.current
-    canvas.height = window.innerHeight - 25
-    canvas.width = window.innerWidth
+    const { width, height } = canvas.parentNode.getBoundingClientRect()
+    canvas.width = width
+    canvas.height = height
 
     const yx = canvas.height / canvas.width
     let newRegion = region || [[-2, 2], []]
@@ -158,17 +329,26 @@ export function Graphit({ fun, color, bgColor, onError }) {
             ]
           : memo
       },
-      onPinch: ({ origin, da: [d, a], first, memo, movement }) => {
-        const [[xmin, xmax], [ymin, ymax], od, [i, j]] = first
-          ? [...region, d, origin]
+      onPinch: ({ origin, da: [d, a], touches, first, memo }) => {
+        if (!first && touches > 2) {
+          memo[4] = false
+        }
+        const [[xmin, xmax], [ymin, ymax], od, [i, j], constraint] = first
+          ? [...region, d, origin, true]
           : memo
-        a = (-a + 90 + 360) % 180
-        a = (a * Math.PI) / 180
         const dd = d - od
+        if (constraint) {
+          a = Math.PI / 4
+        } else {
+          a = (-a + 90 + 360) % 180
+          a = (a * Math.PI) / 180
+        }
+        const ddx = dd * Math.abs(Math.cos(a))
+        const ddy = dd * Math.abs(Math.sin(a))
 
         const canvas = canvasRef.current
-        const dy = dj2dy(dd * Math.abs(Math.sin(a)))
-        const dx = di2dx(dd * Math.abs(Math.cos(a)))
+        const dx = di2dx(ddx)
+        const dy = dj2dy(ddy)
         const dxmin = lerp(0, dx, i / canvas.width)
         const dymin = lerp(0, dy, j / canvas.height)
         setRegion([
@@ -176,7 +356,9 @@ export function Graphit({ fun, color, bgColor, onError }) {
           [ymin + (dy - dymin), ymax - dymin],
         ])
 
-        return first ? [[xmin, xmax], [ymin, ymax], od, [i, j]] : memo
+        return first
+          ? [[xmin, xmax], [ymin, ymax], od, [i, j], constraint]
+          : memo
       },
       onWheel: ({ movement: [, dj], first, memo, event, altKey, shiftKey }) => {
         const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
