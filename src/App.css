@@ -5,7 +5,9 @@
   flex-direction: column;
 }
 .wrapper {
-  flex: 1;
+  flex: 1 1 auto;
+  overflow: hidden;
+  height: 0;
 }
 
 .function {
@@ -22,6 +24,7 @@
   background: rgba(255, 255, 255, 0.1);
   border: none;
   outline: none;
+  min-width: 0;
 }
 
 .theme-switcher {

@@ -287,8 +287,11 @@ export function Graphit({ fun, theme, onError }) {
   const size = useCallback(() => {
     const canvas = canvasRef.current
     const { width, height } = canvas.parentNode.getBoundingClientRect()
-    canvas.width = width
-    canvas.height = height
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = width * dpr
+    canvas.height = height * dpr
+    const ctx = canvas.getContext('2d')
+    ctx.lineWidth = 1.5 * dpr
 
     const yx = canvas.height / canvas.width
     let newRegion = region || [[-2, 2], []]
