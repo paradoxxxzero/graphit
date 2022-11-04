@@ -33,7 +33,7 @@ export function Graphit({ fun, theme, onError }) {
     x => {
       const { width } = canvasRef.current
       const [[xmin, xmax]] = region
-      return Math.round((x - xmin) * (width / (xmax - xmin)))
+      return (x - xmin) * (width / (xmax - xmin))
     },
     [region]
   )
@@ -51,7 +51,7 @@ export function Graphit({ fun, theme, onError }) {
     y => {
       const { height } = canvasRef.current
       const [, [ymin, ymax]] = region
-      return Math.round(height - (y - ymin) * (height / (ymax - ymin)))
+      return height - (y - ymin) * (height / (ymax - ymin))
     },
     [region]
   )
