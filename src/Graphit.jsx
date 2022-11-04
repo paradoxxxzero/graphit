@@ -334,12 +334,12 @@ export function Graphit({ fun, theme, onError }) {
             ]
           : memo
       },
-      onPinch: ({ origin, da: [d, a], touches, first, memo }) => {
+      onPinch: ({ origin: [i, j], da: [d, a], touches, first, memo }) => {
         if (!first && touches > 2) {
-          memo[4] = false
+          memo[3] = false
         }
-        const [[xmin, xmax], [ymin, ymax], od, [i, j], constraint] = first
-          ? [...region, d, origin, true]
+        const [[xmin, xmax], [ymin, ymax], od, constraint] = first
+          ? [...region, d, true]
           : memo
         const dd = d - od
         if (constraint) {
@@ -361,9 +361,7 @@ export function Graphit({ fun, theme, onError }) {
           [ymin + (dy - dymin), ymax - dymin],
         ])
 
-        return first
-          ? [[xmin, xmax], [ymin, ymax], od, [i, j], constraint]
-          : memo
+        return first ? [[xmin, xmax], [ymin, ymax], od, constraint] : memo
       },
       onWheel: ({ movement: [, dj], first, memo, event, altKey, shiftKey }) => {
         const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
