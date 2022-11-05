@@ -1,11 +1,5 @@
 import { useGesture } from '@use-gesture/react'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import './Graphit.css'
 import { lerp, clamp, orderRange } from './utils'
 
@@ -17,9 +11,8 @@ const PARAMETRIC_PRECISION = PARAMETRIC_MAX / 512
 const TICK_SIZE = 10
 const MIN_TICK = 200
 
-export function Graphit({ fun, theme, onError }) {
+export function Graphit({ fun, theme, region, onRegion, onError }) {
   const canvasRef = useRef(null)
-  const [region, setRegion] = useState(null)
 
   const i2x = useCallback(
     i => {
@@ -295,8 +288,8 @@ export function Graphit({ fun, theme, onError }) {
 
     const yx = canvas.height / canvas.width
     let newRegion = region || [[-2, 2], []]
-    setRegion([newRegion[0], newRegion[0].map(x => x * yx)])
-  }, [region])
+    onRegion([newRegion[0], newRegion[0].map(x => x * yx)])
+  }, [onRegion, region])
 
   useEffect(() => {
     window.addEventListener('resize', size)
@@ -323,7 +316,7 @@ export function Graphit({ fun, theme, onError }) {
         const dx = di2dx(i * window.devicePixelRatio)
         const dy = dj2dy(-j * window.devicePixelRatio)
 
-        setRegion([
+        onRegion([
           [xmin - dx, xmax - dx],
           [ymin - dy, ymax - dy],
         ])
@@ -369,7 +362,7 @@ export function Graphit({ fun, theme, onError }) {
           dy,
           clamp((j * window.devicePixelRatio) / canvas.height, 0, 1)
         )
-        setRegion([
+        onRegion([
           [xmin + dxmin, xmax - (dx - dxmin)],
           [ymin + (dy - dymin), ymax - dymin],
         ])
@@ -386,7 +379,7 @@ export function Graphit({ fun, theme, onError }) {
         const dx = shiftKey ? 0 : di2dx(-dj * (canvas.width / canvas.height))
         const dxmin = lerp(0, dx, i / canvas.width)
         const dymin = lerp(0, dy, j / canvas.height)
-        setRegion([
+        onRegion([
           [xmin + dxmin, xmax - (dx - dxmin)],
           [ymin + (dy - dymin), ymax - dymin],
         ])

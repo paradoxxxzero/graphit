@@ -26,20 +26,106 @@
   outline: none;
   min-width: 0;
 }
+.function input::selection {
+  background: rgba(0, 0, 0, 0.3);
+  color:rgba(255, 255, 255, 0.8)
+}
 
-.theme-switcher {
+.controls {
   position: fixed;
   right: 0;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.2);
+  z-index: 1;
+  margin: 0.5em;
+  display: flex;
+  flex-direction: column;
+}
+.controls button {
   font-family: monospace;
   font-size: 1.5em;
-  z-index: 1;
-  padding: 0.5em;
-  margin: 0.5em;
-}
-.theme-switcher::selection {
   background: transparent;
-  color:rgba(255, 255, 255, 0.8)
+  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0.5em;
+  padding: 0.5em;
+  line-height: 1em;
+}
+
+.controls button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.controls button:active {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 1);
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 3;
+}
+.modal-content {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1em;
+  border-radius: 0.5em;
+  color: white;
+  font-family: monospace;
+  font-size: 1.5em;
+  max-width: 80%;
+  z-index: 4;
+}
+
+.modal-header {
+  font-size: 1.5em;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 1em;
+  display: flex;
+  flex-direction: row;
+}
+
+.modal-header h2 {
+  flex: 1;
+  margin: .5em 3em .5em 0;
+}
+
+.modal-close {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 1.5em;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  align-self: center;
+  line-height:0;
+}
+
+.modal-body {
+  font-size: 1em;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 1em;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1em;
 }

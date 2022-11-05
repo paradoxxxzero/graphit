@@ -5,7 +5,7 @@ import './index.css'
 
 // Horrible hack to get rid of the math module:
 for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
-  window[key.toLowerCase()] = Math[key]
+  window[key.toLowerCase()] = window[key] = Math[key]
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
