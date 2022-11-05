@@ -7,12 +7,14 @@ import { useCallback } from 'react'
 
 const getParams = () => {
   const hash = window.location.hash.slice(1)
-  const params = new URLSearchParams('?' + hash)
+  const params = new URLSearchParams('?' + atob(hash))
   return {
     fun:
       params.get('fun') ||
       'y = sin(pow(x, 4))/x ; y = cos(pow(2, sin(x**2))) ; r = cos(o) * sin(o); { x = cos(3*t)*.75, y = sin(2*t)*.75 }',
     theme: params.get('theme') || 'tango',
+    duration: parseFloat(params.get('duration') || 1),
+    sampleRate: ~~(params.get('sampleRate') || 44100),
   }
 }
 
@@ -23,8 +25,8 @@ export function App() {
   const [error, setError] = useState(null)
   const [audioContext, setAudioContext] = useState(null)
   const [masterGain, setMasterGain] = useState(null)
-  const [duration, setDuration] = useState(1)
-  const [sampleRate, setSampleRate] = useState(44100)
+  const [duration, setDuration] = useState(initialParams.duration)
+  const [sampleRate, setSampleRate] = useState(initialParams.sampleRate)
   const [loop, setLoop] = useState(false)
   const [volume, setVolume] = useState(0.5)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -60,10 +62,14 @@ export function App() {
       window.history.pushState(
         null,
         null,
-        `#fun=${encodeURIComponent(fun)}&theme=${encodeURIComponent(theme)}`
+        `#${btoa(
+          `fun=${encodeURIComponent(fun)}&theme=${encodeURIComponent(
+            theme
+          )}&duration=${duration}&sampleRate=${sampleRate}`
+        )}`
       )
     }
-  }, [fun, theme, error])
+  }, [fun, theme, error, duration, sampleRate])
 
   const playAudio = useCallback(() => {
     let ctx = audioContext,
@@ -118,7 +124,7 @@ export function App() {
       }
     })
     setRegion([
-      [0, 1],
+      [0, duration],
       [-1, 1],
     ])
   }, [audioContext, duration, fun, loop, masterGain, sampleRate])
@@ -238,8 +244,9 @@ export function App() {
                 <input
                   type="number"
                   name="duration"
+                  step={0.1}
                   value={duration}
-                  onChange={e => setDuration(~~e.target.value)}
+                  onChange={e => setDuration(parseFloat(e.target.value))}
                 />
               </div>
               <div className="form-group">
