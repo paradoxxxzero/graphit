@@ -4,6 +4,10 @@ import './App.css'
 import themes from './themes'
 import { useEffect } from 'react'
 import { useCallback } from 'react'
+import { getFunctionType, getValuesForType, allocate } from './utils'
+import Plotter from './plotter.worker.js?worker'
+
+const workers = []
 
 const getParams = () => {
   const hash = window.location.hash.slice(1)
@@ -74,7 +78,7 @@ export function App() {
     }
   }, [fun, theme, error, duration, sampleRate])
 
-  const playAudio = useCallback(() => {
+  const playAudio = useCallback(async () => {
     let ctx = audioContext,
       master = masterGain
     if (!ctx) {
@@ -87,45 +91,80 @@ export function App() {
       dynamicsCompressor.connect(ctx.destination)
     }
 
-    const funs = fun.split(';')
     const count = duration * sampleRate
 
-    funs.forEach((fun, i) => {
-      const match = fun.match(/^\s*y\s*=\s*(.+)/)
-      if (match) {
-        // eslint-disable-next-line no-new-func
-        const plotter = new Function('x', 'return ' + match[1])
-        const buffer = ctx.createBuffer(1, count, sampleRate)
-        const data = buffer.getChannelData(0)
-        for (let i = 0; i < count; i++) {
-          // Plotting from 0 to duration
-          data[i] = plotter((i * duration) / sampleRate)
-        }
-        const attack = 0.01
-        const release = 0.01
-        const gain = ctx.createGain()
-        gain.connect(master)
+    const errors = []
+    const data = await Promise.all(
+      fun.split(';').map(
+        (fun, i) =>
+          new Promise(resolve => {
+            let type, values, functions
+            try {
+              ;({ type, functions } = getFunctionType(fun))
+              if (type !== 'linear') {
+                resolve()
+                return
+              }
+              values = allocate(count)
+              for (let j = 0; j < count; j++) {
+                values[j] = (j * duration) / sampleRate
+              }
+            } catch (e) {
+              errors.push(e)
+              return
+            }
+            if (!workers[i]) {
+              workers[i] = new Plotter()
+            }
 
-        gain.gain.setValueAtTime(0, ctx.currentTime)
-        gain.gain.linearRampToValueAtTime(1, ctx.currentTime + attack)
-        gain.gain.setValueAtTime(1, ctx.currentTime + attack)
-        gain.gain.linearRampToValueAtTime(
-          1,
-          ctx.currentTime + duration - release
-        )
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration)
+            const plotter = workers[i]
+            plotter.postMessage({
+              index: i,
+              type,
+              functions,
+              values,
+              dimensions: 1,
+            })
+            plotter.onmessage = ({ data }) => resolve(data)
+          })
+      )
+    )
 
-        const source = ctx.createBufferSource()
-        source.buffer = buffer
-        source.loop = loop
-        source.onended = () => {
-          gain.disconnect(master)
-          source.disconnect(gain)
-        }
-        source.connect(gain)
-        source.start()
+    for (let i = 0; i < data.length; i++) {
+      if (!data[i]) continue
+      const { values, err } = data[i]
+      if (err) {
+        errors.push(err)
+        continue
       }
-    })
+      const buffer = ctx.createBuffer(1, count, sampleRate)
+      const bufferData = buffer.getChannelData(0)
+      // Can we remove the copy?
+      for (let i = 0; i < count; i++) {
+        // Plotting from 0 to duration
+        bufferData[i] = values[i]
+      }
+      const attack = 0.01
+      const release = 0.01
+      const gain = ctx.createGain()
+      gain.connect(master)
+
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + attack)
+      gain.gain.setValueAtTime(1, ctx.currentTime + attack)
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + duration - release)
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration)
+
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.loop = loop
+      source.onended = () => {
+        gain.disconnect(master)
+        source.disconnect(gain)
+      }
+      source.connect(gain)
+      source.start()
+    }
     setRegion([
       [0, duration],
       [-1, 1],

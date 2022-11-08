@@ -45,13 +45,22 @@ export function getFunctionType(fun) {
   }
   return { type, functions }
 }
+export const allocate = size => {
+  if (window.SharedArrayBuffer) {
+    console.log('Using SharedArrayBuffer')
+    return new Float32Array(new window.SharedArrayBuffer(size * 4))
+  } else {
+    return new Float32Array(size)
+  }
+}
 
 export function getValuesForType(type, x, y, i2x, j2y, options) {
   let values,
     n = 0
+
   switch (type) {
     case 'linear':
-      values = new Float64Array((2 * x) / options.precision)
+      values = allocate((2 * x) / options.precision)
 
       for (let i = 0; i < x; i += options.precision) {
         values[n] = i2x(i)
@@ -59,7 +68,7 @@ export function getValuesForType(type, x, y, i2x, j2y, options) {
       }
       break
     case 'linear-horizontal':
-      values = new Float64Array((2 * y) / options.precision)
+      values = allocate((2 * y) / options.precision)
 
       for (let j = 0; j < y; j += options.precision) {
         values[n] = j2y(j)
@@ -68,14 +77,14 @@ export function getValuesForType(type, x, y, i2x, j2y, options) {
       break
 
     case 'polar':
-      values = new Float64Array((2 * options.polarMax) / options.polarPrecision)
+      values = allocate((2 * options.polarMax) / options.polarPrecision)
       for (let o = 0; o < options.polarMax; o += options.polarPrecision) {
         values[n] = o
         n += 2
       }
       break
     case 'parametric':
-      values = new Float64Array(
+      values = allocate(
         (2 * options.parametricMax) / options.parametricPrecision
       )
       for (

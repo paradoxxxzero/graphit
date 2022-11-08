@@ -192,10 +192,10 @@ export const Graphit = memo(
         )
       )
 
-      console.log('Clearing')
       redraw()
 
       for (let i = 0; i < data.length; i++) {
+        if (!data[i]) continue
         const { index, values, skips, err } = data[i]
 
         if (err) {
@@ -306,7 +306,6 @@ export const Graphit = memo(
             ddx = dd * Math.abs(Math.cos(a))
             ddy = dd * Math.abs(Math.sin(a))
           }
-          console.log(ddy > canvas.height)
 
           // FIXME
           const dx = di2dx(Math.min(ddx, canvas.width - 1))
