@@ -310,15 +310,8 @@ export const Graphit = memo(
 
           return first ? [[xmin, xmax], [ymin, ymax], a, oscale] : memo
         },
-        onWheel: ({
-          movement: [, dj],
-          first,
-          memo,
-          event,
-          altKey,
-          shiftKey,
-        }) => {
-          const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
+        onWheel: ({ delta: [, dj], event, altKey, shiftKey }) => {
+          const [[xmin, xmax], [ymin, ymax]] = region
           const { clientX: i, clientY: j } = event
           const canvas = canvasRef.current
           const dy = altKey ? 0 : dj2dy(-dj)
@@ -329,13 +322,6 @@ export const Graphit = memo(
             [xmin + dxmin, xmax - (dx - dxmin)],
             [ymin + (dy - dymin), ymax - dymin],
           ])
-
-          return first
-            ? [
-                [xmin, xmax],
-                [ymin, ymax],
-              ]
-            : memo
         },
       },
       {
