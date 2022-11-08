@@ -286,48 +286,29 @@ export const Graphit = memo(
               ]
             : memo
         },
-        onPinch: ({ origin, da: [d, a], touches, first, memo }) => {
-          const canvas = canvasRef.current
-          if (!first && touches > 2) {
-            memo[4] = false
+        onPinch: ({ origin, da, movement: [scale], touches, first, memo }) => {
+          if (!first && touches > 2 && !memo[3]) {
+            const a = (-da[1] + 90 + 360) % 180
+            memo[3] = a > 45 && a < 135 ? 'v' : 'h'
+            memo[4] = scale
           }
-          const [[xmin, xmax], [ymin, ymax], od, [i, j], constraint] = first
-            ? [...region, d, origin, true]
+          const [[xmin, xmax], [ymin, ymax], a, orientation, oscale] = first
+            ? [...region, da[1], null, null]
             : memo
-          const dd = (d - od) * window.devicePixelRatio * 2
-
-          let ddx, ddy
-          if (constraint) {
-            ddy = dd
-            ddx = (ddy * canvas.width) / canvas.height
+          let xscale, yscale
+          if (!orientation) {
+            xscale = yscale = scale
           } else {
-            a = (-a + 90 + 360) % 180
-            a = (a * Math.PI) / 180
-            ddx = dd * Math.abs(Math.cos(a))
-            ddy = dd * Math.abs(Math.sin(a))
+            xscale = orientation === 'h' ? scale : oscale
+            yscale = orientation === 'v' ? scale : oscale
           }
 
-          // FIXME
-          const dx = di2dx(Math.min(ddx, canvas.width - 1))
-          const dy = dj2dy(Math.min(ddy, canvas.height - 1))
-          const dxmin = lerp(
-            0,
-            dx,
-            clamp((i * window.devicePixelRatio) / canvas.width, 0, 1)
-          )
-          const dymin = lerp(
-            0,
-            dy,
-            clamp((j * window.devicePixelRatio) / canvas.height, 0, 1)
-          )
           onRegion([
-            [xmin + dxmin, xmax - (dx - dxmin)],
-            [ymin + (dy - dymin), ymax - dymin],
+            [xmin / xscale, xmax / xscale],
+            [ymin / yscale, ymax / yscale],
           ])
 
-          return first
-            ? [[xmin, xmax], [ymin, ymax], od, origin, constraint]
-            : memo
+          return first ? [[xmin, xmax], [ymin, ymax], a, oscale] : memo
         },
         onWheel: ({
           movement: [, dj],
