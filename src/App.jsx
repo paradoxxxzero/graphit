@@ -30,7 +30,10 @@ export function App() {
   const [loop, setLoop] = useState(false)
   const [volume, setVolume] = useState(0.5)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [region, setRegion] = useState(null)
+  const [region, setRegion] = useState([
+    [0, 0],
+    [0, 0],
+  ])
 
   const toggleSettings = useCallback(() => {
     setSettingsOpen(!settingsOpen)
