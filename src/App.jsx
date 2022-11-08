@@ -138,14 +138,11 @@ export function App() {
         continue
       }
       const buffer = ctx.createBuffer(1, count, sampleRate)
-      const bufferData = buffer.getChannelData(0)
       // Can we remove the copy?
-      for (let i = 0; i < count; i++) {
-        // Plotting from 0 to duration
-        bufferData[i] = values[i]
-      }
-      const attack = 0.01
-      const release = 0.01
+      buffer.copyToChannel(values, 0)
+
+      const attack = 0.001
+      const release = 0.001
       const gain = ctx.createGain()
       gain.connect(master)
 
