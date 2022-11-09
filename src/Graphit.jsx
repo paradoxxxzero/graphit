@@ -112,8 +112,10 @@ export const Graphit = memo(
         // Draw ticks
         ctx.strokeStyle = theme.tick
         ctx.fillStyle = theme.foreground
-        ctx.beginPath()
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
 
+        ctx.beginPath()
         const xTick = orderRange(xmin, xmax, dx2di, MIN_TICK)
 
         for (let x = xTick.min; x < xTick.max; x += xTick.step) {
@@ -122,12 +124,15 @@ export const Graphit = memo(
 
           ctx.moveTo(i, j)
           ctx.lineTo(i, j + TICK_SIZE)
-          ctx.fillText(
-            xTick.precision ? x.toFixed(xTick.precision) : x,
-            i,
-            j + TICK_SIZE * 2
-          )
+          x &&
+            ctx.fillText(
+              xTick.precision ? x.toFixed(xTick.precision) : x,
+              i,
+              j + TICK_SIZE * 2
+            )
         }
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
         const yTick = orderRange(ymin, ymax, dy2dj, MIN_TICK)
 
         for (let y = yTick.min; y < yTick.max; y += yTick.step) {
@@ -136,11 +141,12 @@ export const Graphit = memo(
 
           ctx.moveTo(i + TICK_SIZE, j)
           ctx.lineTo(i, j)
-          ctx.fillText(
-            yTick.precision ? y.toFixed(yTick.precision) : y,
-            i + TICK_SIZE * 2,
-            j
-          )
+          y &&
+            ctx.fillText(
+              yTick.precision ? y.toFixed(yTick.precision) : y,
+              i + TICK_SIZE * 2,
+              j
+            )
         }
         ctx.stroke()
       }
