@@ -77,6 +77,8 @@ function reducer(state, action) {
           [-1, 1],
         ],
       }
+    case 'resetRegion':
+      return { ...state, region: null }
     case 'loop':
       return { ...state, loop: action.loop }
     default:
@@ -139,9 +141,10 @@ export function App() {
   }, [size])
 
   useLayoutEffect(() => {
-    size()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (state.region === null) {
+      size()
+    }
+  }, [state.region, size])
 
   const handleFunctions = useCallback(async functions => {
     setFunctionsText(functions)
@@ -224,6 +227,20 @@ export function App() {
             <path
               fill="currentColor"
               d="M12 22q-2.05 0-3.875-.788q-1.825-.787-3.187-2.15q-1.363-1.362-2.15-3.187Q2 14.05 2 12q0-2.075.812-3.9q.813-1.825 2.201-3.175Q6.4 3.575 8.25 2.787Q10.1 2 12.2 2q2 0 3.775.688q1.775.687 3.112 1.9q1.338 1.212 2.125 2.875Q22 9.125 22 11.05q0 2.875-1.75 4.412Q18.5 17 16 17h-1.85q-.225 0-.312.125q-.088.125-.088.275q0 .3.375.862q.375.563.375 1.288q0 1.25-.688 1.85q-.687.6-1.812.6Zm-5.5-9q.65 0 1.075-.425Q8 12.15 8 11.5q0-.65-.425-1.075Q7.15 10 6.5 10q-.65 0-1.075.425Q5 10.85 5 11.5q0 .65.425 1.075Q5.85 13 6.5 13Zm3-4q.65 0 1.075-.425Q11 8.15 11 7.5q0-.65-.425-1.075Q10.15 6 9.5 6q-.65 0-1.075.425Q8 6.85 8 7.5q0 .65.425 1.075Q8.85 9 9.5 9Zm5 0q.65 0 1.075-.425Q16 8.15 16 7.5q0-.65-.425-1.075Q15.15 6 14.5 6q-.65 0-1.075.425Q13 6.85 13 7.5q0 .65.425 1.075Q13.85 9 14.5 9Zm3 4q.65 0 1.075-.425Q19 12.15 19 11.5q0-.65-.425-1.075Q18.15 10 17.5 10q-.65 0-1.075.425Q16 10.85 16 11.5q0 .65.425 1.075Q16.85 13 17.5 13Z"
+            />
+          </svg>
+        </button>
+        <button onClick={() => dispatch({ type: 'resetRegion' })}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            preserveAspectRatio="xMidYMid meet"
+            viewBox="0 0 32 32"
+          >
+            <path
+              fill="currentColor"
+              d="M6 12H4V4h8v2H6v6zm22 0h-2V6h-6V4h8v8zM12 28H4v-8h2v6h6v2zm16 0h-8v-2h6v-6h2v8zM15 10h2v4h-2zm-5 5h4v2h-4zm8 0h4v2h-4zm-3 3h2v4h-2z"
             />
           </svg>
         </button>
