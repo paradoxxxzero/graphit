@@ -152,7 +152,6 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      console.trace()
       const errors = []
       const data = await Promise.all(
         functions.split(';').map(

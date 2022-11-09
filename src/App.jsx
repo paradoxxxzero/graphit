@@ -57,9 +57,17 @@ function reducer(state, action) {
     case 'sampleRate':
       return { ...state, sampleRate: parseInt(action.sampleRate) }
     case 'region':
-      return {
-        ...state,
-        region: action.region.map(minmax => minmax.map(parseFloat)),
+      const region = action.region.map(minmax => minmax.map(parseFloat))
+      if (
+        !state.region ||
+        region[0][0] !== state.region[0][1] ||
+        region[0][1] !== state.region[0][1] ||
+        region[1][0] !== state.region[1][0] ||
+        region[1][1] !== state.region[1][1]
+      ) {
+        return { ...state, region }
+      } else {
+        return state
       }
     case 'audioRegion':
       return {
