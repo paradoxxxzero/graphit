@@ -24,11 +24,11 @@ self.adsr = (x, a = 0.2, d = 0.1, s = 0.2, r = 0.2, sl = 0.5) =>
     ? sl - ((sl - 0) * (x - a - d - s)) / r // release - linear decrease from s to 0
     : 0 // end - constant value of 0
 
-onmessage = ({ data: { index, functions, type, values, dimensions = 2 } }) => {
+onmessage = ({ data: { index, funs, type, values, dimensions = 2 } }) => {
   let err = '',
     skips = [0]
   try {
-    const plotters = functions.map(
+    const plotters = funs.map(
       // eslint-disable-next-line no-new-func
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
@@ -36,6 +36,10 @@ onmessage = ({ data: { index, functions, type, values, dimensions = 2 } }) => {
       const value = values[i]
       if (dimensions === 1) {
         values[i] = plotters[0](value)
+        if (isNaN(values[i])) {
+          values[i] = null
+          throw new Error('NaN')
+        }
       } else {
         if (type === 'parametric') {
           values[i] = plotters[0](value)

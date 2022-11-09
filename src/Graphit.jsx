@@ -23,7 +23,7 @@ const MIN_TICK = 200
 const workers = []
 
 export const Graphit = memo(
-  function ({ fun, theme, region, onRegion, onError }) {
+  function ({ functions, theme, region, onRegion }) {
     const canvasRef = useRef(null)
     // console.log(...region, fun, theme)
 
@@ -100,9 +100,6 @@ export const Graphit = memo(
     )
 
     const plot = useCallback(async () => {
-      if (region[0][0] === region[0][1] || region[1][0] === region[1][1]) {
-        return
-      }
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
       const [[xmin, xmax], [ymin, ymax]] = region
@@ -155,15 +152,15 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-
+      console.trace()
       const errors = []
       const data = await Promise.all(
-        fun.split(';').map(
+        functions.split(';').map(
           (fun, i) =>
             new Promise(resolve => {
-              let type, values, functions
+              let type, values, funs
               try {
-                ;({ type, functions } = getFunctionType(fun))
+                ;({ type, funs } = getFunctionType(fun))
                 values = getValuesForType(
                   type,
                   canvas.width,
@@ -173,8 +170,7 @@ export const Graphit = memo(
                   typeOptions
                 )
               } catch (e) {
-                errors.push(e)
-                return
+                resolve({ err: e })
               }
               if (!workers[i]) {
                 workers[i] = new Plotter()
@@ -184,7 +180,7 @@ export const Graphit = memo(
               plotter.postMessage({
                 index: i,
                 type,
-                functions,
+                funs,
                 values,
               })
               plotter.onmessage = ({ data }) => resolve(data)
@@ -216,8 +212,7 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      console.warn(...errors)
-      onError(errors.map(e => e.message).join('\n'))
+      console.error(...errors)
       return true
     }, [
       region,
@@ -230,8 +225,7 @@ export const Graphit = memo(
       y2j,
       dx2di,
       dy2dj,
-      fun,
-      onError,
+      functions,
       i2x,
       j2y,
     ])
@@ -244,11 +238,7 @@ export const Graphit = memo(
       canvas.height = height * dpr
       const ctx = canvas.getContext('2d')
       ctx.lineWidth = 1.5 * dpr
-
-      const yx = canvas.height / canvas.width
-      let newRegion = region.reduce((a, b) => a + b, 0) ? [[-2, 2], []] : region
-      onRegion([newRegion[0], newRegion[0].map(x => x * yx)])
-    }, [onRegion, region])
+    }, [])
 
     useEffect(() => {
       window.addEventListener('resize', size)

@@ -11,9 +11,11 @@
 }
 
 .function {
+  position: relative;
   font-size: 0.75em;
   text-align: center;
   display: flex;
+  flex-direction: column;
 }
 .function input {
   margin: .5em 1em;
@@ -29,6 +31,12 @@
 .function input::selection {
   background: rgba(0, 0, 0, 0.3);
   color:rgba(255, 255, 255, 0.8)
+}
+.function .errors {
+  margin: 1em;
+  position: absolute;
+  left: 1em;
+  top: -2em;
 }
 
 .controls {

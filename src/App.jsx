@@ -1,183 +1,211 @@
-import { useState } from 'react'
-import { Graphit } from './Graphit'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
+import qs from 'qs'
 import './App.css'
+import { Graphit } from './Graphit'
 import themes from './themes'
-import { useEffect } from 'react'
-import { useCallback } from 'react'
-import { getFunctionType, getValuesForType, allocate } from './utils'
+import { Audio } from './Audio'
+import { getFunctionType } from './utils'
 import Plotter from './plotter.worker.js?worker'
 
-const workers = []
+const initialState = {
+  theme: 'tango',
+  duration: 1,
+  sampleRate: 44100,
+  volume: 0.5,
+  region: null,
+  loop: false,
+  functions:
+    'y = sin(pow(x, 4))/x ; y = cos(pow(2, sin(x**2))) ; r = cos(o) * sin(o); { x = cos(3*t)*.75, y = sin(2*t)*.75 }',
+}
 
-const getParams = () => {
-  const hash = window.location.hash.slice(1)
-  const params = new URLSearchParams('?' + atob(hash))
-  return {
-    fun:
-      params.get('fun') ||
-      'y = sin(pow(x, 4))/x ; y = cos(pow(2, sin(x**2))) ; r = cos(o) * sin(o); { x = cos(3*t)*.75, y = sin(2*t)*.75 }',
-    theme: params.get('theme') || 'tango',
-    duration: parseFloat(params.get('duration') || 1),
-    sampleRate: ~~(params.get('sampleRate') || 44100),
+const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
+
+const testPlotter = new Plotter()
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'all':
+      return {
+        ...state,
+        functions: action.functions,
+        theme: action.theme,
+        volume: parseFloat(action.volume),
+        duration: parseFloat(action.duration),
+        sampleRate: parseInt(action.sampleRate),
+        region: action.region.map(minmax => minmax.map(parseFloat)),
+        loop: action.loop === 'true',
+      }
+    case 'functions':
+      return { ...state, functions: action.functions }
+    case 'theme':
+      return { ...state, theme: action.theme }
+    case 'nextTheme':
+      const themesNames = Object.keys(themes)
+      const index = themesNames.indexOf(state.theme)
+      return { ...state, theme: themesNames[(index + 1) % themesNames.length] }
+    case 'volume':
+      return { ...state, volume: parseFloat(action.volume) }
+    case 'duration':
+      return { ...state, duration: parseFloat(action.duration) }
+    case 'sampleRate':
+      return { ...state, sampleRate: parseInt(action.sampleRate) }
+    case 'region':
+      return {
+        ...state,
+        region: action.region.map(minmax => minmax.map(parseFloat)),
+      }
+    case 'audioRegion':
+      return {
+        ...state,
+        region: [
+          [0, state.duration],
+          [-1, 1],
+        ],
+      }
+    case 'loop':
+      return { ...state, loop: action.loop }
+    default:
+      throw new Error()
+  }
+}
+function debounce(func, timeout = 300) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      func.apply(this, args)
+    }, timeout)
+  }
+}
+const pushState = debounce(state => {
+  if (state.region) {
+    const newQuery = qs.stringify(state, qsOptions)
+    if (newQuery !== window.location.search) {
+      window.history.pushState(null, null, newQuery)
+    }
+  }
+}, 100)
+
+function urlMiddleware(reducer) {
+  return (state, action) => {
+    const newState = reducer(state, action)
+
+    if (state.region && action.type !== 'all') {
+      pushState(state)
+    }
+    return newState
   }
 }
 
 export function App() {
-  const initialParams = getParams()
-  const [fun, setFun] = useState(initialParams.fun)
-  const [theme, setTheme] = useState(initialParams.theme)
-  const [error, setError] = useState(null)
-  const [audioContext, setAudioContext] = useState(null)
-  const [masterGain, setMasterGain] = useState(null)
-  const [duration, setDuration] = useState(initialParams.duration)
-  const [sampleRate, setSampleRate] = useState(initialParams.sampleRate)
-  const [loop, setLoop] = useState(false)
-  const [volume, setVolume] = useState(0.5)
+  const [errors, setErrors] = useState([])
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [region, setRegion] = useState([
-    [0, 0],
-    [0, 0],
-  ])
+  const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
+  const [functionsText, setFunctionsText] = useState(state.functions)
+  const [playAudio, setPlayAudio] = useState(null)
+  const wrapperRef = useRef()
 
-  const toggleSettings = useCallback(() => {
-    setSettingsOpen(!settingsOpen)
-  }, [settingsOpen])
+  const size = useCallback(() => {
+    const wrapper = wrapperRef.current
+    const { width, height } = wrapper.getBoundingClientRect()
+    const ratio = height / width
+    const region = state.region || [[-2, 2]]
+    region[1] = [
+      region[0][0] * ratio, // Keep ratio
+      region[0][1] * ratio,
+    ]
 
-  const nextTheme = useCallback(() => {
-    const themesNames = Object.keys(themes)
-    const index = themesNames.indexOf(theme)
-    setTheme(themesNames[(index + 1) % themesNames.length])
-  }, [theme])
+    dispatch({ type: 'region', region })
+  }, [state.region])
 
   useEffect(() => {
-    const hashChange = () => {
-      const { fun, theme } = getParams()
-      if (fun) {
-        setFun(fun)
-      }
-      if (theme) {
-        setTheme(theme)
-      }
-    }
-    hashChange()
-    window.addEventListener('hashchange', hashChange)
-    return () => window.removeEventListener('hashchange', hashChange)
+    window.addEventListener('resize', size)
+    return () => window.removeEventListener('resize', size)
+  }, [size])
+
+  useLayoutEffect(() => {
+    size()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (!error) {
-      window.history.pushState(
-        null,
-        null,
-        `#${btoa(
-          `fun=${encodeURIComponent(fun)}&theme=${encodeURIComponent(
-            theme
-          )}&duration=${duration}&sampleRate=${sampleRate}`
-        )}`
-      )
-    }
-  }, [fun, theme, error, duration, sampleRate])
-
-  const playAudio = useCallback(async () => {
-    let ctx = audioContext,
-      master = masterGain
-    if (!ctx) {
-      ctx = new AudioContext()
-      master = ctx.createGain()
-      setAudioContext(ctx)
-      setMasterGain(master)
-      const dynamicsCompressor = ctx.createDynamicsCompressor()
-      master.connect(dynamicsCompressor)
-      dynamicsCompressor.connect(ctx.destination)
-    }
-
-    const count = duration * sampleRate
-
-    const errors = []
+  const handleFunctions = useCallback(async functions => {
+    setFunctionsText(functions)
     const data = await Promise.all(
-      fun.split(';').map(
+      functions.split(';').map(
         (fun, i) =>
           new Promise(resolve => {
-            let type, values, functions
+            let type, funs
             try {
-              ;({ type, functions } = getFunctionType(fun))
-              if (type !== 'linear') {
-                resolve()
-                return
-              }
-              values = allocate(count)
-              for (let j = 0; j < count; j++) {
-                values[j] = (j * duration) / sampleRate
-              }
+              ;({ type, funs } = getFunctionType(fun))
             } catch (e) {
-              errors.push(e)
-              return
-            }
-            if (!workers[i]) {
-              workers[i] = new Plotter()
+              resolve({ err: e })
             }
 
-            const plotter = workers[i]
-            plotter.postMessage({
+            testPlotter.postMessage({
               index: i,
               type,
-              functions,
-              values,
+              funs,
+              values: [0],
               dimensions: 1,
             })
-            plotter.onmessage = ({ data }) => resolve(data)
+            testPlotter.onmessage = ({ data }) => resolve(data)
           })
       )
     )
-
-    for (let i = 0; i < data.length; i++) {
-      if (!data[i]) continue
-      const { values, err } = data[i]
-      if (err) {
-        errors.push(err)
-        continue
-      }
-      const buffer = ctx.createBuffer(1, count, sampleRate)
-      // Can we remove the copy?
-      buffer.copyToChannel(values, 0)
-
-      const attack = 0.001
-      const release = 0.001
-      const gain = ctx.createGain()
-      gain.connect(master)
-
-      gain.gain.setValueAtTime(0, ctx.currentTime)
-      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + attack)
-      gain.gain.setValueAtTime(1, ctx.currentTime + attack)
-      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + duration - release)
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration)
-
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.loop = loop
-      source.onended = () => {
-        gain.disconnect(master)
-        source.disconnect(gain)
-      }
-      source.connect(gain)
-      source.start()
+    const errors = data.map(d => d.err).filter(x => x)
+    if (errors.length) {
+      console.warn(...errors)
+      setErrors(errors)
+      return
     }
-    setRegion([
-      [0, duration],
-      [-1, 1],
-    ])
-  }, [audioContext, duration, fun, loop, masterGain, sampleRate])
+
+    dispatch({ type: 'functions', functions })
+    setErrors([])
+  }, [])
 
   useEffect(() => {
-    if (audioContext) {
-      masterGain.gain.setTargetAtTime(volume, audioContext.currentTime, 0.01)
+    if (functionsText !== state.functions) {
+      setFunctionsText(state.functions)
     }
-  }, [audioContext, masterGain, volume])
+    // Run only when state.functions changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.functions])
+
+  const theme = themes[state.theme]
+
+  const toggleSettings = useCallback(() => {
+    setSettingsOpen(settingsOpen => !settingsOpen)
+  }, [])
+
+  const handleSetPlayAudio = useCallback(playAudio => {
+    setPlayAudio(() => () => {
+      dispatch({ type: 'audioRegion' })
+      playAudio()
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    const popstate = () => {
+      const queryString = qs.parse(window.location.search, qsOptions)
+      Object.keys(queryString).length &&
+        dispatch({ type: 'all', ...queryString })
+    }
+    popstate()
+    window.addEventListener('popstate', popstate)
+    return () => window.removeEventListener('popstate', popstate)
+  }, [])
 
   return (
-    <div className="App" style={{ backgroundColor: themes[theme].background }}>
+    <div className="App" style={{ backgroundColor: theme.background }}>
       <div className="controls">
-        <button onClick={nextTheme}>
+        <button onClick={() => dispatch({ type: 'nextTheme' })}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
@@ -191,20 +219,22 @@ export function App() {
             />
           </svg>
         </button>
-        <button onClick={playAudio}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="1em"
-            height="1em"
-            preserveAspectRatio="xMidYMid meet"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="m9.5 16.5l7-4.5l-7-4.5ZM12 22q-2.075 0-3.9-.788q-1.825-.787-3.175-2.137q-1.35-1.35-2.137-3.175Q2 14.075 2 12t.788-3.9q.787-1.825 2.137-3.175q1.35-1.35 3.175-2.138Q9.925 2 12 2t3.9.787q1.825.788 3.175 2.138q1.35 1.35 2.137 3.175Q22 9.925 22 12t-.788 3.9q-.787 1.825-2.137 3.175q-1.35 1.35-3.175 2.137Q14.075 22 12 22Z"
-            />
-          </svg>
-        </button>
+        {playAudio ? (
+          <button onClick={playAudio}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="1em"
+              height="1em"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="currentColor"
+                d="m9.5 16.5l7-4.5l-7-4.5ZM12 22q-2.075 0-3.9-.788q-1.825-.787-3.175-2.137q-1.35-1.35-2.137-3.175Q2 14.075 2 12t.788-3.9q.787-1.825 2.137-3.175q1.35-1.35 3.175-2.138Q9.925 2 12 2t3.9.787q1.825.788 3.175 2.138q1.35 1.35 2.137 3.175Q22 9.925 22 12t-.788 3.9q-.787 1.825-2.137 3.175q-1.35 1.35-3.175 2.137Q14.075 22 12 22Z"
+              />
+            </svg>
+          </button>
+        ) : null}
         <button onClick={toggleSettings}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -219,24 +249,54 @@ export function App() {
             />
           </svg>
         </button>
+        {/* {spectrogramData && (
+          <button onClick={toggleSpectrogram}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="1em"
+              height="1em"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox="0 0 32 32"
+            >
+              <path
+                fill="currentColor"
+                d="m20.476 8.015l-7.029-3.804a2.008 2.008 0 0 0-2.115.205L4 10.001V2H2v26a2 2 0 0 0 2 2h26V5.735ZM28 20.21l-7.62 1.802l-7.029-2.884a1.99 1.99 0 0 0-2.022.37L4 25.836V21.38l8.375-9.4l7.019 5.62a2.015 2.015 0 0 0 2.046.212l6.56-3.21ZM12.524 5.985l7.03 3.804a2.012 2.012 0 0 0 1.34.16L28 8.265v4.113l-7.381 3.642L13.6 10.4a1.99 1.99 0 0 0-2.688.264L4 18.384v-5.87ZM4.55 28l8.069-7.011l7.029 2.884a1.998 1.998 0 0 0 1.147.077L28 22.26V28Z"
+              />
+            </svg>
+          </button>
+        )} */}
       </div>
-      <div className="wrapper">
-        <Graphit
-          fun={fun}
-          theme={themes[theme]}
-          region={region}
-          onRegion={setRegion}
-          onError={setError}
-        ></Graphit>
+      <div className="wrapper" ref={wrapperRef}>
+        {state.region ? (
+          <Graphit
+            functions={state.functions}
+            theme={theme}
+            region={state.region}
+            onRegion={region => dispatch({ type: 'region', region })}
+          ></Graphit>
+        ) : null}
+        <Audio
+          functions={state.functions}
+          theme={theme}
+          duration={state.duration}
+          sampleRate={state.sampleRate}
+          volume={state.volume}
+          loop={state.loop}
+          setAudioRegion={() => dispatch({ type: 'audioRegion' })}
+          setPlayAudio={handleSetPlayAudio}
+        />
       </div>
       <div className="function">
+        <pre className="errors" style={{ color: theme.error }}>
+          {errors.map(e => e.message).join(', ')}
+        </pre>
         <input
           type="text"
-          value={fun}
+          value={functionsText}
           style={{
-            color: error ? themes[theme].error : themes[theme].foreground,
+            color: errors.length ? theme.error : theme.foreground,
           }}
-          onChange={e => setFun(e.target.value)}
+          onChange={e => handleFunctions(e.target.value)}
         />
       </div>
       {settingsOpen ? (
@@ -267,8 +327,10 @@ export function App() {
                 <select
                   name="theme"
                   id="theme"
-                  value={theme}
-                  onChange={e => setTheme(e.target.value)}
+                  value={state.theme}
+                  onChange={e =>
+                    dispatch({ type: 'theme', theme: e.target.value })
+                  }
                 >
                   {Object.keys(themes).map(key => (
                     <option key={key} value={key}>
@@ -284,8 +346,10 @@ export function App() {
                   type="number"
                   name="duration"
                   step={0.1}
-                  value={duration}
-                  onChange={e => setDuration(parseFloat(e.target.value))}
+                  value={state.duration}
+                  onChange={e =>
+                    dispatch({ type: 'duration', duration: e.target.value })
+                  }
                 />
               </div>
               <div className="form-group">
@@ -293,8 +357,10 @@ export function App() {
                 <input
                   type="number"
                   name="sampleRate"
-                  value={sampleRate}
-                  onChange={e => setSampleRate(~~e.target.value)}
+                  value={state.sampleRate}
+                  onChange={e =>
+                    dispatch({ type: 'sampleRate', sampleRate: e.target.value })
+                  }
                 />
               </div>
               <div className="form-group">
@@ -305,8 +371,10 @@ export function App() {
                   min={0}
                   max={1}
                   step={0.1}
-                  value={volume}
-                  onChange={e => setVolume(parseFloat(e.target.value))}
+                  value={state.volume}
+                  onChange={e =>
+                    dispatch({ type: 'volume', volume: e.target.value })
+                  }
                 />
               </div>
               <div className="form-group">
@@ -314,8 +382,10 @@ export function App() {
                 <input
                   type="checkbox"
                   name="loop"
-                  checked={loop}
-                  onChange={e => setLoop(e.target.checked)}
+                  checked={state.loop}
+                  onChange={e =>
+                    dispatch({ type: 'loop', loop: e.target.checked })
+                  }
                 />
               </div>
             </div>

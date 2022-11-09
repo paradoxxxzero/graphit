@@ -27,23 +27,23 @@ export function orderRange(min, max, proj, minTick) {
 }
 
 export function getFunctionType(fun) {
-  let match, type, functions
+  let match, type, funs
   if ((match = fun.match(/^\s*y\s*=\s*(.+)/))) {
     type = 'linear'
-    functions = [match[1]]
+    funs = [match[1]]
   } else if ((match = fun.match(/^\s*x\s*=\s*(.+)/))) {
     type = 'linear-horizontal'
-    functions = [match[1]]
+    funs = [match[1]]
   } else if ((match = fun.match(/^\s*r\s*=\s*(.+)/))) {
     type = 'polar'
-    functions = [match[1]]
+    funs = [match[1]]
   } else if ((match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)}/))) {
     type = 'parametric'
-    functions = [match[1], match[2]]
+    funs = [match[1], match[2]]
   } else {
     throw new Error('Invalid function')
   }
-  return { type, functions }
+  return { type, funs }
 }
 export const allocate = size => {
   if (window.SharedArrayBuffer) {
