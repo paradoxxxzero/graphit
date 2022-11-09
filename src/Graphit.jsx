@@ -1,14 +1,8 @@
 import { useGesture } from '@use-gesture/react'
-import { useCallback, useEffect, useLayoutEffect, useRef, memo } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import './Graphit.css'
-import {
-  lerp,
-  clamp,
-  orderRange,
-  getFunctionType,
-  getValuesForType,
-} from './utils'
-import Plotter from './plotter.worker.js?worker'
+import { plotFunctions } from './plotter'
+import { clamp, getValuesForType, lerp, orderRange } from './utils'
 
 const typeOptions = {
   precision: 1,
@@ -20,12 +14,10 @@ const typeOptions = {
 
 const TICK_SIZE = 10
 const MIN_TICK = 200
-const workers = []
 
 export const Graphit = memo(
   function ({ functions, theme, region, hide, onRegion }) {
     const canvasRef = useRef(null)
-    // console.log(...region, fun, theme)
 
     const i2x = useCallback(
       i => {
@@ -152,40 +144,17 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      const errors = []
-      const data = await Promise.all(
-        functions.split(';').map(
-          (fun, i) =>
-            new Promise(resolve => {
-              let type, values, funs
-              try {
-                ;({ type, funs } = getFunctionType(fun))
-                values = getValuesForType(
-                  type,
-                  canvas.width,
-                  canvas.height,
-                  i2x,
-                  j2y,
-                  typeOptions
-                )
-              } catch (e) {
-                resolve({ err: e })
-              }
-              if (!workers[i]) {
-                workers[i] = new Plotter()
-              }
-
-              const plotter = workers[i]
-              plotter.postMessage({
-                index: i,
-                type,
-                funs,
-                values,
-              })
-              plotter.onmessage = ({ data }) => resolve(data)
-            })
+      const data = await plotFunctions(functions, type =>
+        getValuesForType(
+          type,
+          canvas.width,
+          canvas.height,
+          i2x,
+          j2y,
+          typeOptions
         )
       )
+      const errors = []
 
       redraw()
 

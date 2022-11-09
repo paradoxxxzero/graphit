@@ -28,22 +28,29 @@ export function orderRange(min, max, proj, minTick) {
 
 export function getFunctionType(fun) {
   let match, type, funs
-  if ((match = fun.match(/^\s*y\s*=\s*(.+)/))) {
+  if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*/))) {
     type = 'linear'
     funs = [match[1]]
-  } else if ((match = fun.match(/^\s*x\s*=\s*(.+)/))) {
+  } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*/))) {
     type = 'linear-horizontal'
     funs = [match[1]]
-  } else if ((match = fun.match(/^\s*r\s*=\s*(.+)/))) {
+  } else if ((match = fun.match(/^\s*r\s*=\s*(.+)\s*/))) {
     type = 'polar'
     funs = [match[1]]
-  } else if ((match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)}/))) {
+  } else if (
+    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}/))
+  ) {
     type = 'parametric'
     funs = [match[1], match[2]]
+  } else if ((match = fun.match(/^\s*(.+)\s*=\s*(.+)\s*/))) {
+    type = 'affect'
+    funs = [match[1], match[2]]
   } else {
-    throw new Error('Invalid function')
+    type = 'unknown'
+    funs = []
   }
-  return { type, funs }
+
+  return { type, funs: funs.map(f => f.trim()) }
 }
 export const allocate = size => {
   if (window.SharedArrayBuffer) {
@@ -71,7 +78,7 @@ export function getValuesForType(type, x, y, i2x, j2y, options) {
       values = allocate((2 * y) / options.precision)
 
       for (let j = 0; j < y; j += options.precision) {
-        values[n] = j2y(j)
+        values[n + 1] = j2y(j)
         n += 2
       }
       break
@@ -96,8 +103,9 @@ export function getValuesForType(type, x, y, i2x, j2y, options) {
         n += 2
       }
       break
+    case 'unknown':
     default:
-      throw new Error('Invalid function type')
+      values = null
   }
   return values
 }

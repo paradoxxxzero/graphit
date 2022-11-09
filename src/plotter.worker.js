@@ -30,8 +30,8 @@ self.adsr = (
   x,
   attack = 0.2,
   decay = 0.1,
-  sustain = 0.2,
-  release = 0.2,
+  sustain = 0.4,
+  release = 0.3,
   sustainLevel = 0.5
 ) =>
   x < 0
@@ -49,7 +49,7 @@ self.adsr = (
 
 self.__doc__ = {
   [self.adsr]:
-    'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.2, release = 0.2, sustainLevel = 0.5)',
+    'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5)',
   [self.osc]: 'osc usage: (freq, x, type = sine|square|sawtooth|triangle)',
   // MATH functions
   [self.abs]: 'Returns the absolute value of x.',
@@ -98,22 +98,36 @@ self.__doc__ = {
     'Returns the integer portion of x, removing any fractional digits.',
 }
 
-onmessage = ({ data: { index, funs, type, values, dimensions = 2 } }) => {
+const affected = {}
+
+onmessage = ({
+  data: { index, funs, type, values, affects, dimensions = 2, uuid },
+}) => {
   let err = '',
     skips = [0]
   try {
+    for (let i = 0; i < affects.length; i++) {
+      const [name, valueText] = affects[i]
+      // eslint-disable-next-line no-new-func
+      const value = new Function('', 'return ' + valueText)()
+      affected[name] = self[name]
+      self[name] = value
+    }
+
     const plotters = funs.map(
       // eslint-disable-next-line no-new-func
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
+
     for (let i = 0; i < values.length; i += dimensions) {
-      const value = values[i]
       if (dimensions === 1) {
-        values[i] = plotters[0](value)
+        values[i] = plotters[0](values[i])
         if (typeof values[i] !== 'number') {
           let e
           if (typeof values[i] === 'function') {
             e = new Error(self.__doc__[values[i]] || 'Function not supported')
+          } else if (typeof values[i] === 'undefined') {
+            e = new Error(`${funs[0]} is undefined`)
           } else {
             e = new Error(`${typeof values[i]} is not a number`)
           }
@@ -122,21 +136,31 @@ onmessage = ({ data: { index, funs, type, values, dimensions = 2 } }) => {
         }
       } else {
         if (type === 'parametric') {
+          const value = values[i]
           values[i] = plotters[0](value)
           values[i + 1] = plotters[1](value)
         } else {
-          values[i] = value
-          values[i + 1] = plotters[0](value)
-          if (type === 'polar') {
-            values[i] = values[i + 1] * Math.cos(value)
-            values[i + 1] *= Math.sin(value)
+          if (type === 'linear-horizontal') {
+            values[i] = plotters[0](values[i + 1])
+          } else {
+            values[i + 1] = plotters[0](values[i])
+            if (type === 'polar') {
+              const value = values[i]
+              values[i] = values[i + 1] * Math.cos(value)
+              values[i + 1] *= Math.sin(value)
+            }
           }
         }
       }
+    }
+    for (let i = 0; i < affects.length; i++) {
+      const [name] = affects[i]
+      self[name] = affected[name]
+      delete affected[name]
     }
   } catch (e) {
     err = e
   }
 
-  postMessage({ index, values, type, skips, err })
+  postMessage({ index, values, type, skips, err, uuid })
 }

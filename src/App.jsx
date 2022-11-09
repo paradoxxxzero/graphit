@@ -1,3 +1,4 @@
+import qs from 'qs'
 import {
   useCallback,
   useEffect,
@@ -6,14 +7,12 @@ import {
   useRef,
   useState,
 } from 'react'
-import qs from 'qs'
 import './App.css'
-import { Graphit } from './Graphit'
-import themes from './themes'
 import { Audio } from './Audio'
-import { getFunctionType } from './utils'
+import { Graphit } from './Graphit'
+import { plotFunctions } from './plotter'
 import { Spectrogram } from './Spectrogram'
-import Plotter from './plotter.worker.js?worker'
+import themes from './themes'
 
 const initialState = {
   theme: 'tango',
@@ -28,20 +27,25 @@ const initialState = {
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
 
-const workers = []
-
 function reducer(state, action) {
   switch (action.type) {
     case 'all':
       return {
         ...state,
-        functions: action.functions,
-        theme: action.theme,
-        volume: parseFloat(action.volume),
-        duration: parseFloat(action.duration),
-        sampleRate: parseInt(action.sampleRate),
-        region: action.region.map(minmax => minmax.map(parseFloat)),
-        loop: action.loop === 'true',
+        functions: action.functions || state.functions,
+        theme:
+          (Object.keys(themes).includes(action.theme) && action.theme) ||
+          state.theme,
+        volume: parseFloat(action.volume) || state.volume,
+        duration: parseFloat(action.duration) || state.duration,
+        sampleRate: parseInt(action.sampleRate) || state.sampleRate,
+        region: action.region
+          ? action.region.map(minmax => minmax.map(parseFloat))
+          : state.region,
+        loop:
+          typeof action.loop !== 'undefined'
+            ? action.loop === 'true'
+            : state.loop,
       }
     case 'functions':
       return { ...state, functions: action.functions }
@@ -152,32 +156,7 @@ export function App() {
   const handleFunctions = useCallback(async functions => {
     setFunctionsText(functions)
 
-    const data = await Promise.all(
-      functions.split(';').map(
-        (fun, i) =>
-          new Promise(resolve => {
-            let type, funs
-            try {
-              ;({ type, funs } = getFunctionType(fun))
-            } catch (e) {
-              resolve({ err: e })
-            }
-            if (!workers[i]) {
-              workers[i] = new Plotter()
-            }
-
-            const plotter = workers[i]
-            plotter.postMessage({
-              index: i,
-              type,
-              funs,
-              values: [0],
-              dimensions: 1,
-            })
-            plotter.onmessage = ({ data }) => resolve(data)
-          })
-      )
-    )
+    const data = await plotFunctions(functions, () => [0], { dimensions: 1 })
     const errors = data.map(d => d.err).filter(x => x)
     if (errors.length) {
       console.warn(...errors)
@@ -248,11 +227,15 @@ export function App() {
             width="1em"
             height="1em"
             preserveAspectRatio="xMidYMid meet"
-            viewBox="0 0 32 32"
+            viewBox="0 0 24 24"
           >
             <path
-              fill="currentColor"
-              d="M6 12H4V4h8v2H6v6zm22 0h-2V6h-6V4h8v8zM12 28H4v-8h2v6h6v2zm16 0h-8v-2h6v-6h2v8zM15 10h2v4h-2zm-5 5h4v2h-4zm8 0h4v2h-4zm-3 3h2v4h-2z"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="m15 15l6 6m-6-6v4.8m0-4.8h4.8M9 19.8V15m0 0H4.2M9 15l-6 6M15 4.2V9m0 0h4.8M15 9l6-6M9 4.2V9m0 0H4.2M9 9L3 3"
             />
           </svg>
         </button>
