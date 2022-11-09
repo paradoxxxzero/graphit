@@ -33,6 +33,11 @@ export const Spectrogram = ({ data, theme }) => {
     ctx.fillStyle = theme.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+    const light =
+      parseColor(theme.background).reduce((a, b) => a + b) / 3 > 128
+        ? 1 / 255
+        : -1 / 255
+
     for (let i = 0; i < data.length; i++) {
       let { index, spectrogram } = data[i]
       let start = 0
@@ -56,18 +61,18 @@ export const Spectrogram = ({ data, theme }) => {
       if (!spectrogram.length) {
         continue
       }
-      const [r, g, b] = parseColor(theme.colors[index])
+      const [r, g, b] = parseColor(theme.colors[index]).map(c => c * light)
       const imageData = ctx.getImageData(0, 0, width, height)
       const thisWidth = spectrogram.length
       const thisHeight = spectrogram[0].length
 
       for (let i = 0; i < thisWidth; i++) {
         for (let j = 0; j < thisHeight; j++) {
-          const k = (i + j * width) * 4
+          const k = (i + (thisHeight - j) * width) * 4
           const value = spectrogram[i][j]
-          imageData.data[k] += (r * value) / 255
-          imageData.data[k + 1] += (g * value) / 255
-          imageData.data[k + 2] += (b * value) / 255
+          imageData.data[k] -= r * value
+          imageData.data[k + 1] -= g * value
+          imageData.data[k + 2] -= b * value
           // imageData.data[k + 3] += value
         }
       }

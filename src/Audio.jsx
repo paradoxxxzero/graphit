@@ -99,10 +99,10 @@ export const Audio = ({
       const spectrogram = []
 
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 2 ** 10
+      analyser.fftSize = 2 ** 11
       // analyser.fftSize = 2**15
-      analyser.smoothingTimeConstant = 0.1
-      analyser.minDecibels = -80
+      analyser.smoothingTimeConstant = 0
+      analyser.minDecibels = -70
       analyser.maxDecibels = -20
       source.connect(analyser)
 
