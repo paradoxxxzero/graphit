@@ -28,7 +28,7 @@ const initialState = {
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
 
-const testPlotter = new Plotter()
+const workers = []
 
 function reducer(state, action) {
   switch (action.type) {
@@ -121,7 +121,7 @@ export function App() {
   const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
   const [functionsText, setFunctionsText] = useState(state.functions)
   const [playAudio, setPlayAudio] = useState(null)
-  const [spectrogram, setSpectrogram] = useState(null)
+  const [spectrograms, setSpectrograms] = useState([])
   const [displaySpectrogram, setDisplaySpectrogram] = useState(false)
   const wrapperRef = useRef()
 
@@ -151,6 +151,7 @@ export function App() {
 
   const handleFunctions = useCallback(async functions => {
     setFunctionsText(functions)
+
     const data = await Promise.all(
       functions.split(';').map(
         (fun, i) =>
@@ -161,15 +162,19 @@ export function App() {
             } catch (e) {
               resolve({ err: e })
             }
+            if (!workers[i]) {
+              workers[i] = new Plotter()
+            }
 
-            testPlotter.postMessage({
+            const plotter = workers[i]
+            plotter.postMessage({
               index: i,
               type,
               funs,
               values: [0],
               dimensions: 1,
             })
-            testPlotter.onmessage = ({ data }) => resolve(data)
+            plotter.onmessage = ({ data }) => resolve(data)
           })
       )
     )
@@ -267,7 +272,7 @@ export function App() {
             </svg>
           </button>
         ) : null}
-        {spectrogram && (
+        {spectrograms.length ? (
           <button onClick={toggleSpectrogram}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -282,7 +287,7 @@ export function App() {
               />
             </svg>
           </button>
-        )}
+        ) : null}
         <button onClick={toggleSettings}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -305,6 +310,7 @@ export function App() {
             theme={theme}
             region={state.region}
             onRegion={region => dispatch({ type: 'region', region })}
+            hide={displaySpectrogram}
           ></Graphit>
         ) : null}
         <Audio
@@ -316,9 +322,11 @@ export function App() {
           loop={state.loop}
           setAudioRegion={() => dispatch({ type: 'audioRegion' })}
           setPlayAudio={handleSetPlayAudio}
-          setSpectrogram={setSpectrogram}
+          setSpectrograms={setSpectrograms}
         />
-        {displaySpectrogram && <Spectrogram data={spectrogram} theme={theme} />}
+        {displaySpectrogram && (
+          <Spectrogram data={spectrograms} theme={theme} />
+        )}
       </div>
       <div className="function">
         <pre className="errors" style={{ color: theme.error }}>

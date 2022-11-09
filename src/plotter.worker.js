@@ -36,9 +36,9 @@ onmessage = ({ data: { index, funs, type, values, dimensions = 2 } }) => {
       const value = values[i]
       if (dimensions === 1) {
         values[i] = plotters[0](value)
-        if (isNaN(values[i])) {
+        if (typeof values[i] !== 'number') {
           values[i] = null
-          throw new Error('NaN')
+          throw new Error(`${typeof values[i]} is not a number`)
         }
       } else {
         if (type === 'parametric') {

@@ -12,7 +12,7 @@ export const Audio = ({
   volume,
   loop,
   setPlayAudio,
-  setSpectrogram,
+  setSpectrograms,
 }) => {
   const [audioContext, setAudioContext] = useState(null)
   const [masterGain, setMasterGain] = useState(null)
@@ -69,9 +69,12 @@ export const Audio = ({
       )
     )
 
+    const spectrograms = []
+
+    let playing = 0
     for (let i = 0; i < data.length; i++) {
       if (!data[i]) continue
-      const { values, err } = data[i]
+      const { index, values, err } = data[i]
       if (err) {
         errors.push(err)
         continue
@@ -96,7 +99,11 @@ export const Audio = ({
       const spectrogram = []
 
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 2048
+      analyser.fftSize = 2 ** 10
+      // analyser.fftSize = 2**15
+      analyser.smoothingTimeConstant = 0.1
+      analyser.minDecibels = -80
+      analyser.maxDecibels = -20
       source.connect(analyser)
 
       function extractSpectrogram() {
@@ -105,17 +112,22 @@ export const Audio = ({
         spectrogram.push(frequencyData)
       }
 
-      const interval = setInterval(extractSpectrogram, 1)
-      source.onended = () => {
-        setSpectrogram(spectrogram)
+      const interval = setInterval(extractSpectrogram)
+      // eslint-disable-next-line no-loop-func
+      source.onended = ((index, spectrogram, interval) => () => {
+        playing--
+        spectrograms.push({ index, spectrogram })
+        if (playing === 0) {
+          setSpectrograms(spectrograms)
+        }
         clearInterval(interval)
         gain.disconnect(master)
         source.disconnect(gain)
-      }
+      })(index, spectrogram, interval)
 
       source.connect(gain)
       source.start()
-      extractSpectrogram()
+      playing++
     }
   }, [
     audioContext,
@@ -124,7 +136,7 @@ export const Audio = ({
     loop,
     masterGain,
     sampleRate,
-    setSpectrogram,
+    setSpectrograms,
   ])
 
   useEffect(() => {

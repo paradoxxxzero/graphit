@@ -23,7 +23,7 @@ const MIN_TICK = 200
 const workers = []
 
 export const Graphit = memo(
-  function ({ functions, theme, region, onRegion }) {
+  function ({ functions, theme, region, hide, onRegion }) {
     const canvasRef = useRef(null)
     // console.log(...region, fun, theme)
 
@@ -318,7 +318,13 @@ export const Graphit = memo(
       }
     )
 
-    return <canvas ref={canvasRef} className="canvas" />
+    return (
+      <canvas
+        ref={canvasRef}
+        className="canvas"
+        style={hide ? { display: 'none' } : {}}
+      />
+    )
   },
   (prev, next) => {
     // console.log(
