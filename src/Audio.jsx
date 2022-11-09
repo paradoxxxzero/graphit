@@ -12,9 +12,8 @@ export const Audio = ({
   volume,
   loop,
   setPlayAudio,
+  setSpectrogram,
 }) => {
-  const [spectrogram, setSpectrogram] = useState(false)
-  const canvasRef = useRef(null)
   const [audioContext, setAudioContext] = useState(null)
   const [masterGain, setMasterGain] = useState(null)
 
@@ -94,14 +93,39 @@ export const Audio = ({
       const source = ctx.createBufferSource()
       source.buffer = buffer
       source.loop = loop
+      const spectrogram = []
+
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 2048
+      source.connect(analyser)
+
+      function extractSpectrogram() {
+        const frequencyData = new Uint8Array(analyser.frequencyBinCount)
+        analyser.getByteFrequencyData(frequencyData)
+        spectrogram.push(frequencyData)
+      }
+
+      const interval = setInterval(extractSpectrogram, 1)
       source.onended = () => {
+        setSpectrogram(spectrogram)
+        clearInterval(interval)
         gain.disconnect(master)
         source.disconnect(gain)
       }
+
       source.connect(gain)
       source.start()
+      extractSpectrogram()
     }
-  }, [audioContext, duration, functions, loop, masterGain, sampleRate])
+  }, [
+    audioContext,
+    duration,
+    functions,
+    loop,
+    masterGain,
+    sampleRate,
+    setSpectrogram,
+  ])
 
   useEffect(() => {
     if (audioContext) {
@@ -113,5 +137,5 @@ export const Audio = ({
     setPlayAudio(playAudio)
   }, [playAudio, setPlayAudio])
 
-  return spectrogram && <canvas ref={canvasRef} className="canvas" />
+  return null
 }
