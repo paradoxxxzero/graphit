@@ -47,7 +47,7 @@ export const Audio = ({
               }
               values = allocate(count)
               for (let j = 0; j < count; j++) {
-                values[j] = (j * duration) / sampleRate
+                values[j] = j / sampleRate
               }
             } catch (e) {
               errors.push(e)
@@ -78,11 +78,10 @@ export const Audio = ({
         continue
       }
       const buffer = ctx.createBuffer(1, count, sampleRate)
-      // Can we remove the copy?
       buffer.copyToChannel(values, 0)
 
-      const attack = 0.001
-      const release = 0.001
+      const attack = 0.01
+      const release = 0.01
       const gain = ctx.createGain()
       gain.connect(master)
 
