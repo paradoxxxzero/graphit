@@ -156,7 +156,11 @@ export function App() {
   const handleFunctions = useCallback(async functions => {
     setFunctionsText(functions)
 
-    const data = await plotFunctions(functions, () => [0], { dimensions: 1 })
+    const data = await plotFunctions(
+      functions,
+      () => new Float32Array(1).map(() => 0),
+      { dimensions: 1 }
+    )
     const errors = data.map(d => d.err).filter(x => x)
     if (errors.length) {
       console.warn(...errors)

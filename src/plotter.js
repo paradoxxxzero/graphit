@@ -11,12 +11,11 @@ const uuid4 = () => {
   })
 }
 
-const sendToPlotter = async (index, message) => {
+const sendToPlotter = async (index, message, transfer) => {
   const plotter = workers[index]
   const uuid = uuid4()
 
-  plotter.postMessage({ ...message, uuid })
-
+  plotter.postMessage({ ...message, uuid }, transfer)
   return await new Promise(resolve => {
     const filterMessage = ({ data }) => {
       if (data.uuid === uuid) {
@@ -51,9 +50,12 @@ export const plotFunctions = async (functions, typeToValues, options = {}) => {
   }
 
   // Plot functions
-  return await Promise.all(
+  const data = await Promise.all(
     functionsTypeValues.map(({ index, type, funs, values }) =>
-      sendToPlotter(index, { index, type, funs, values, affects, ...options })
+      sendToPlotter(index, { index, type, funs, values, affects, ...options }, [
+        values.buffer,
+      ])
     )
   )
+  return data
 }

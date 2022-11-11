@@ -162,5 +162,5 @@ onmessage = ({
     err = e
   }
 
-  postMessage({ index, values, type, skips, err, uuid })
+  postMessage({ index, values, type, skips, err, uuid }, [values.buffer])
 }
