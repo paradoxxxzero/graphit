@@ -16,7 +16,7 @@ const TICK_SIZE = 10
 const MIN_TICK = 200
 
 export const Graphit = memo(
-  function ({ functions, theme, region, hide, onRegion }) {
+  function ({ functions, theme, region, hide, recordings, onRegion }) {
     const canvasRef = useRef(null)
 
     const i2x = useCallback(
@@ -150,15 +150,18 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      const data = await plotFunctions(functions, type =>
-        getValuesForType(
-          type,
-          canvas.width,
-          canvas.height,
-          i2x,
-          j2y,
-          typeOptions
-        )
+      const data = await plotFunctions(
+        functions,
+        type =>
+          getValuesForType(
+            type,
+            canvas.width,
+            canvas.height,
+            i2x,
+            j2y,
+            typeOptions
+          ),
+        recordings
       )
       const errors = []
 
@@ -190,6 +193,8 @@ export const Graphit = memo(
       return true
     }, [
       region,
+      functions,
+      recordings,
       theme.background,
       theme.axis,
       theme.tick,
@@ -199,7 +204,6 @@ export const Graphit = memo(
       y2j,
       dx2di,
       dy2dj,
-      functions,
       i2x,
       j2y,
     ])

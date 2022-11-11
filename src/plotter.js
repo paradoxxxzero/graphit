@@ -27,18 +27,26 @@ const sendToPlotter = async (index, message, transfer) => {
   })
 }
 
-export const plotFunctions = async (functions, typeToValues, options = {}) => {
+export const plotFunctions = async (
+  functions,
+  typeToValues,
+  recordings,
+  options = {}
+) => {
   const functionsText = functions.split(';').map(fun => fun.trim())
   const affects = []
   const functionsTypeValues = []
   // Filter plot functions and affects
   for (let i = 0; i < functionsText.length; i++) {
-    const { type, funs } = getFunctionType(functionsText[i])
+    let { type, funs, recs } = getFunctionType(functionsText[i])
     if (type === 'affect') {
       affects.push(funs)
     } else if (type !== 'unknown') {
+      if (recs) {
+        recs.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
+      }
       const values = typeToValues(type)
-      functionsTypeValues.push({ type, funs, values })
+      functionsTypeValues.push({ type, funs, values, recs })
     }
   }
   // Create missing workers
@@ -51,10 +59,12 @@ export const plotFunctions = async (functions, typeToValues, options = {}) => {
 
   // Plot functions
   const data = await Promise.all(
-    functionsTypeValues.map(({ index, type, funs, values }) =>
-      sendToPlotter(index, { index, type, funs, values, affects, ...options }, [
-        values.buffer,
-      ])
+    functionsTypeValues.map(({ index, type, funs, values, recs }) =>
+      sendToPlotter(
+        index,
+        { index, type, funs, values, affects, recs, ...options },
+        [values.buffer]
+      )
     )
   )
   return data

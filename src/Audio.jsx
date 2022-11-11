@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { plotFunctions } from './plotter'
 import { allocate } from './utils'
+import recordProcessor from './recording.worklet?url'
 
 export const Audio = ({
   functions,
@@ -8,7 +9,9 @@ export const Audio = ({
   sampleRate,
   volume,
   loop,
+  recordings,
   setPlayAudio,
+  setRecordAudio,
   setSpectrograms,
 }) => {
   const [audioContext, setAudioContext] = useState(null)
@@ -31,15 +34,13 @@ export const Audio = ({
     const data = await plotFunctions(
       functions,
       type => {
-        if (type !== 'linear') {
-          return
-        }
         const values = allocate(count)
         for (let j = 0; j < count; j++) {
           values[j] = j / sampleRate
         }
         return values
       },
+      recordings,
       { dimensions: 1 }
     )
 
@@ -109,9 +110,66 @@ export const Audio = ({
     functions,
     loop,
     masterGain,
+    recordings,
     sampleRate,
     setSpectrograms,
   ])
+
+  const recordAudio = useCallback(
+    async stream => {
+      let ctx = audioContext,
+        master = masterGain
+      if (!ctx) {
+        ctx = new AudioContext()
+        master = ctx.createGain()
+        setAudioContext(ctx)
+        setMasterGain(master)
+        master.connect(ctx.destination)
+      }
+      const input = ctx.createMediaStreamSource(stream)
+
+      await ctx.audioWorklet.addModule(recordProcessor)
+
+      const workletNode = new AudioWorkletNode(ctx, 'recording-processor')
+      input.connect(workletNode)
+
+      // const filter = ctx.createBiquadFilter()
+      // filter.frequency.value = 60.0
+      // filter.type = filter.NOTCH
+      // filter.Q = 10.0
+
+      // input.connect(filter)
+      const chunks = []
+
+      const getData = ({ data }) => {
+        chunks.push(data)
+      }
+      // I like big bugs and I cannot lie
+      workletNode.port.onmessage = null
+      workletNode.port.addEventListener('message', getData)
+      return async () => {
+        const size = chunks.reduce((a, b) => a + b.length, 0)
+        const buffer = new Float32Array(size)
+        let s = 0
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i]
+          for (let j = 0; j < chunk.length; j++) {
+            buffer[s + j] = chunk[j]
+          }
+          s += chunk.length
+        }
+        workletNode.port.removeEventListener('message', getData)
+
+        input.disconnect(workletNode)
+        // Disconnect
+        stream.getAudioTracks().forEach(track => {
+          track.stop()
+        })
+        return buffer
+      }
+    },
+    [audioContext, masterGain]
+  )
 
   useEffect(() => {
     if (audioContext) {
@@ -122,6 +180,10 @@ export const Audio = ({
   useEffect(() => {
     setPlayAudio(playAudio)
   }, [playAudio, setPlayAudio])
+
+  useEffect(() => {
+    setRecordAudio(recordAudio)
+  }, [recordAudio, setRecordAudio])
 
   return null
 }

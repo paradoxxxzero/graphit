@@ -125,8 +125,12 @@ export function App() {
   const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
   const [functionsText, setFunctionsText] = useState(state.functions)
   const [playAudio, setPlayAudio] = useState(null)
+  const [recordAudio, setRecordAudio] = useState(null)
   const [spectrograms, setSpectrograms] = useState([])
   const [displaySpectrogram, setDisplaySpectrogram] = useState(false)
+  const [microphone, setMicrophone] = useState(null)
+  const [recording, setRecording] = useState(null)
+  const [recordings, setRecordings] = useState([])
   const wrapperRef = useRef()
 
   const size = useCallback(() => {
@@ -153,24 +157,28 @@ export function App() {
     }
   }, [state.region, size])
 
-  const handleFunctions = useCallback(async functions => {
-    setFunctionsText(functions)
+  const handleFunctions = useCallback(
+    async functions => {
+      setFunctionsText(functions)
 
-    const data = await plotFunctions(
-      functions,
-      () => new Float32Array(1).map(() => 0),
-      { dimensions: 1 }
-    )
-    const errors = data.map(d => d.err).filter(x => x)
-    if (errors.length) {
-      console.warn(...errors)
-      setErrors(errors)
-      return
-    }
+      const data = await plotFunctions(
+        functions,
+        () => new Float32Array(1).map(() => 0),
+        recordings,
+        { dimensions: 1 }
+      )
+      const errors = data.map(d => d.err).filter(x => x)
+      if (errors.length) {
+        console.warn(...errors)
+        setErrors(errors)
+        return
+      }
 
-    dispatch({ type: 'functions', functions })
-    setErrors([])
-  }, [])
+      dispatch({ type: 'functions', functions })
+      setErrors([])
+    },
+    [recordings]
+  )
 
   useEffect(() => {
     if (functionsText !== state.functions) {
@@ -196,6 +204,56 @@ export function App() {
       playAudio()
     })
   }, [])
+
+  const handleSetRecordAudio = useCallback(recordAudio => {
+    setRecordAudio(() => stream => recordAudio(stream))
+  }, [])
+
+  const handleMicClick = useCallback(async () => {
+    const hadMicrophone = !!microphone
+    if (
+      !microphone ||
+      microphone.getAudioTracks().some(track => track.readyState === 'ended')
+    ) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        })
+        setMicrophone(stream)
+        if (hadMicrophone) {
+          handleMicClick()
+        }
+      } catch (e) {
+        console.warn(e)
+      }
+    } else {
+      if (!recording) {
+        const stopRecording = await recordAudio(microphone)
+        setRecording(() => () => stopRecording())
+      } else {
+        const data = await recording()
+        const n = recordings.length + 1
+        setRecordings([
+          ...recordings,
+          { buffer: data, sampleRate: state.sampleRate },
+        ])
+        if (!state.functions.includes(`$rec${n}(`)) {
+          dispatch({
+            type: 'functions',
+            functions: `${state.functions.trim()} ; y = $rec${n}(x)`,
+          })
+        }
+        setRecording(null)
+      }
+    }
+  }, [
+    microphone,
+    recordAudio,
+    recording,
+    recordings,
+    state.functions,
+    state.sampleRate,
+  ])
 
   useLayoutEffect(() => {
     const popstate = () => {
@@ -259,6 +317,57 @@ export function App() {
             </svg>
           </button>
         ) : null}
+        {recordAudio ? (
+          <button onClick={handleMicClick}>
+            {microphone ? (
+              recording ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="1em"
+                  height="1em"
+                  preserveAspectRatio="xMidYMid meet"
+                  viewBox="0 0 24 24"
+                  style={{ color: 'red' }}
+                >
+                  <path
+                    fill="currentColor"
+                    d="M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 0 0 0-17ZM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12Zm6-2.5A1.5 1.5 0 0 1 9.5 8h5A1.5 1.5 0 0 1 16 9.5v5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 14.5v-5Z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="1em"
+                  height="1em"
+                  preserveAspectRatio="xMidYMid meet"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M12 18a6 6 0 1 0 0-12a6 6 0 0 0 0 12Zm0-16C6.477 2 2 6.477 2 12s4.477 10 10 10s10-4.477 10-10S17.523 2 12 2ZM3.5 12a8.5 8.5 0 1 1 17 0a8.5 8.5 0 0 1-17 0Z"
+                  />
+                </svg>
+              )
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="1em"
+                height="1em"
+                preserveAspectRatio="xMidYMid meet"
+                viewBox="0 0 32 32"
+              >
+                <path
+                  fill="currentColor"
+                  d="M23 14v3a7 7 0 0 1-14 0v-3H7v3a9 9 0 0 0 8 8.94V28h-4v2h10v-2h-4v-2.06A9 9 0 0 0 25 17v-3Z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M16 22a5 5 0 0 0 5-5V7a5 5 0 0 0-10 0v10a5 5 0 0 0 5 5Z"
+                />
+              </svg>
+            )}
+          </button>
+        ) : null}
         {spectrograms.length ? (
           <button onClick={toggleSpectrogram}>
             <svg
@@ -296,6 +405,7 @@ export function App() {
             functions={state.functions}
             theme={theme}
             region={state.region}
+            recordings={recordings}
             onRegion={region => dispatch({ type: 'region', region })}
             hide={displaySpectrogram}
           ></Graphit>
@@ -307,8 +417,10 @@ export function App() {
           sampleRate={state.sampleRate}
           volume={state.volume}
           loop={state.loop}
+          recordings={recordings}
           setAudioRegion={() => dispatch({ type: 'audioRegion' })}
           setPlayAudio={handleSetPlayAudio}
+          setRecordAudio={handleSetRecordAudio}
           setSpectrograms={setSpectrograms}
         />
         {displaySpectrogram && (

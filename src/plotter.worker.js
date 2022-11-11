@@ -101,7 +101,7 @@ self.__doc__ = {
 const affected = {}
 
 onmessage = ({
-  data: { index, funs, type, values, affects, dimensions = 2, uuid },
+  data: { index, funs, type, values, affects, recs, dimensions = 2, uuid },
 }) => {
   let err = '',
     skips = [0]
@@ -112,6 +112,19 @@ onmessage = ({
       const value = new Function('', 'return ' + valueText)()
       affected[name] = self[name]
       self[name] = value
+    }
+    if (recs) {
+      Object.entries(recs).forEach(([i, rec]) => {
+        if (!rec) {
+          return
+        }
+        self[`$rec${i}`] = x => {
+          const n = ~~(x * rec.sampleRate)
+          if (n > 0 && n < rec.buffer.length) {
+            return rec.buffer[n]
+          }
+        }
+      })
     }
 
     const plotters = funs.map(
@@ -152,6 +165,11 @@ onmessage = ({
           }
         }
       }
+    }
+    if (recs) {
+      Object.keys(recs).forEach(i => {
+        delete self[`$rec${i}`]
+      })
     }
     for (let i = 0; i < affects.length; i++) {
       const [name] = affects[i]

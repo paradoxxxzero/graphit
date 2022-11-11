@@ -27,22 +27,29 @@ export function orderRange(min, max, proj, minTick) {
 }
 
 export function getFunctionType(fun) {
-  let match, type, funs
-  if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*/))) {
+  let match, type, funs, recs
+  if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*$/))) {
     type = 'linear'
-    funs = [match[1]]
-  } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*/))) {
+    const fun = match[1]
+    funs = [fun]
+    if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
+      recs = []
+      match.forEach(rec => {
+        recs.push(rec.match(/\$rec(\d)/)[1])
+      })
+    }
+  } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*$/))) {
     type = 'linear-horizontal'
     funs = [match[1]]
-  } else if ((match = fun.match(/^\s*r\s*=\s*(.+)\s*/))) {
+  } else if ((match = fun.match(/^\s*r\s*=\s*(.+)\s*$/))) {
     type = 'polar'
     funs = [match[1]]
   } else if (
-    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}/))
+    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}$/))
   ) {
     type = 'parametric'
     funs = [match[1], match[2]]
-  } else if ((match = fun.match(/^\s*(.+)\s*=\s*(.+)\s*/))) {
+  } else if ((match = fun.match(/^\s*(.+)\s*=\s*(.+)\s*$/))) {
     type = 'affect'
     funs = [match[1], match[2]]
   } else {
@@ -50,7 +57,7 @@ export function getFunctionType(fun) {
     funs = []
   }
 
-  return { type, funs: funs.map(f => f.trim()) }
+  return { type, funs: funs.map(f => f.trim()), recs }
 }
 export const allocate = size => {
   if (window.SharedArrayBuffer) {
