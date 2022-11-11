@@ -134,17 +134,16 @@ onmessage = ({
 
     for (let i = 0; i < values.length; i += dimensions) {
       if (dimensions === 1) {
-        values[i] = plotters[0](values[i])
-        if (typeof values[i] !== 'number') {
+        const val = plotters[0](values[i])
+        if (typeof val !== 'number') {
           let e
-          if (typeof values[i] === 'function') {
-            e = new Error(self.__doc__[values[i]] || 'Function not supported')
-          } else if (typeof values[i] === 'undefined') {
+          if (typeof val === 'function') {
+            e = new Error(self.__doc__[val] || 'Function not supported')
+          } else if (typeof val === 'undefined') {
             e = new Error(`${funs[0]} is undefined`)
           } else {
-            e = new Error(`${typeof values[i]} is not a number`)
+            e = new Error(`${typeof val} is not a number`)
           }
-          values[i] = null
           throw e
         }
       } else {

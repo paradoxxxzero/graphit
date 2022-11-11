@@ -112,8 +112,8 @@ function urlMiddleware(reducer) {
   return (state, action) => {
     const newState = reducer(state, action)
 
-    if (state.region && action.type !== 'all') {
-      pushState(state)
+    if (newState.region && action.type !== 'all') {
+      pushState(newState)
     }
     return newState
   }
