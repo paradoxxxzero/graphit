@@ -119,7 +119,7 @@ onmessage = ({
           return
         }
         self[`$rec${i}`] = x => {
-          const n = ~~(x * rec.sampleRate)
+          const n = ~~Math.round(x * rec.sampleRate)
           if (n >= 0 && n < rec.buffer.length) {
             return rec.buffer[n]
           }

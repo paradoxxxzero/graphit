@@ -144,6 +144,7 @@ export function App() {
   const [microphone, setMicrophone] = useState(null)
   const [recording, setRecording] = useState(null)
   const [recordings, setRecordings] = useState([])
+  const [saveUrl, setSaveUrl] = useState(null)
   const wrapperRef = useRef()
 
   const size = useCallback(() => {
@@ -212,9 +213,10 @@ export function App() {
   }, [])
 
   const handleSetPlayAudio = useCallback(playAudio => {
-    setPlayAudio(() => () => {
+    setPlayAudio(() => async () => {
       dispatch({ type: 'audioRegion' })
-      playAudio()
+      const url = await playAudio()
+      setSaveUrl(url)
     })
   }, [])
 
@@ -289,7 +291,10 @@ export function App() {
   return (
     <div className="App" style={{ backgroundColor: theme.background }}>
       <div className="controls">
-        <button onClick={() => dispatch({ type: 'nextTheme' })}>
+        <button
+          className="button"
+          onClick={() => dispatch({ type: 'nextTheme' })}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
@@ -303,7 +308,10 @@ export function App() {
             />
           </svg>
         </button>
-        <button onClick={() => dispatch({ type: 'resetRegion' })}>
+        <button
+          className="button"
+          onClick={() => dispatch({ type: 'resetRegion' })}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
@@ -322,7 +330,7 @@ export function App() {
           </svg>
         </button>
         {playAudio ? (
-          <button onClick={playAudio}>
+          <button className="button" onClick={playAudio}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="1em"
@@ -338,7 +346,7 @@ export function App() {
           </button>
         ) : null}
         {recordAudio ? (
-          <button onClick={handleMicClick}>
+          <button className="button" onClick={handleMicClick}>
             {microphone ? (
               recording ? (
                 <svg
@@ -389,7 +397,7 @@ export function App() {
           </button>
         ) : null}
         {spectrograms.length ? (
-          <button onClick={toggleSpectrogram}>
+          <button className="button" onClick={toggleSpectrogram}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="1em"
@@ -404,7 +412,23 @@ export function App() {
             </svg>
           </button>
         ) : null}
-        <button onClick={toggleSettings}>
+        {saveUrl ? (
+          <a className="button" href={saveUrl} download="graphit.wav">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="1em"
+              height="1em"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="currentColor"
+                d="M6.75 3h-1A2.75 2.75 0 0 0 3 5.75v12.5A2.75 2.75 0 0 0 5.75 21H6v-6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 15v6h.25A2.75 2.75 0 0 0 21 18.25V8.286a3.25 3.25 0 0 0-.952-2.299l-2.035-2.035A3.25 3.25 0 0 0 15.75 3v4.5a2.25 2.25 0 0 1-2.25 2.25H9A2.25 2.25 0 0 1 6.75 7.5V3Zm7.5 0v4.5a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75V3h6Zm2.25 18v-6a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75v6h9Z"
+              />
+            </svg>
+          </a>
+        ) : null}
+        <button className="button" onClick={toggleSettings}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
