@@ -255,14 +255,15 @@ export const Graphit = memo(
             : memo
         },
         onPinch: ({ origin, da, movement: [scale], touches, first, memo }) => {
-          if (!first && touches > 2 && !memo[3]) {
+          if (!first && touches > 2 && !memo[4]) {
             const a = (-da[1] + 90 + 360) % 180
-            memo[3] = a > 45 && a < 135 ? 'v' : 'h'
-            memo[4] = scale
+            memo[4] = a > 45 && a < 135 ? 'v' : 'h'
+            memo[5] = scale
           }
-          const [[xmin, xmax], [ymin, ymax], a, orientation, oscale] = first
-            ? [...region, da[1], null, null]
-            : memo
+          const dpr = window.devicePixelRatio || 1
+          const canvas = canvasRef.current
+          const [[xmin, xmax], [ymin, ymax], [i, j], a, orientation, oscale] =
+            first ? [...region, origin, da[1], null, null] : memo
           let xscale, yscale
           if (!orientation) {
             xscale = yscale = scale
@@ -270,13 +271,19 @@ export const Graphit = memo(
             xscale = orientation === 'h' ? scale : oscale
             yscale = orientation === 'v' ? scale : oscale
           }
+          const xShift = (xmax - xmin) * (1 / xscale - 1)
+          const yShift = (ymax - ymin) * (1 / yscale - 1)
+          const xShiftMin = lerp(0, xShift, (dpr * i) / canvas.width)
+          const yShiftMin = lerp(0, yShift, 1 - (dpr * j) / canvas.height)
 
           onRegion([
-            [xmin / xscale, xmax / xscale],
-            [ymin / yscale, ymax / yscale],
+            [xmin - xShiftMin, xmax + (xShift - xShiftMin)],
+            [ymin - yShiftMin, ymax + (yShift - yShiftMin)],
           ])
 
-          return first ? [[xmin, xmax], [ymin, ymax], a, oscale] : memo
+          return first
+            ? [[xmin, xmax], [ymin, ymax], origin, a, orientation, oscale]
+            : memo
         },
         onWheel: ({ delta: [, dj], event, altKey, shiftKey }) => {
           const [[xmin, xmax], [ymin, ymax]] = region

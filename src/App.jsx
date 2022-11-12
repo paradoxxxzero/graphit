@@ -70,6 +70,10 @@ function reducer(state, action) {
         region[1][0] !== state.region[1][0] ||
         region[1][1] !== state.region[1][1]
       ) {
+        if (region[0][1] <= region[0][0] || region[1][1] <= region[1][0]) {
+          console.error('Inverted region', region)
+          return state
+        }
         return { ...state, region }
       } else {
         return state
