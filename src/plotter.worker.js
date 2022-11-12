@@ -158,6 +158,7 @@ onmessage = ({
             values[i] = plotters[0](values[i + 1])
           } else {
             values[i + 1] = plotters[0](values[i])
+
             if (type === 'polar') {
               const value = values[i]
               values[i] = values[i + 1] * Math.cos(value)

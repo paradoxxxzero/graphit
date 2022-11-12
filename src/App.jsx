@@ -100,7 +100,13 @@ function reducer(state, action) {
         ],
       }
     case 'resetRegion':
-      return { ...state, region: null }
+      return {
+        ...state,
+        region: [
+          [-2, 2],
+          [-2 * action.ratio, 2 * action.ratio],
+        ],
+      }
     case 'loop':
       return { ...state, loop: action.loop }
     default:
@@ -151,20 +157,18 @@ export function App() {
   const [saveUrl, setSaveUrl] = useState(null)
   const wrapperRef = useRef()
 
-  const size = useCallback(() => {
+  const handleResetRegion = useCallback(() => {
     const wrapper = wrapperRef.current
     const { width, height } = wrapper.getBoundingClientRect()
     const ratio = height / width
+    dispatch({ type: 'resetRegion', ratio })
+  }, [])
+
+  const size = useCallback(() => {
     if (!state.region) {
-      dispatch({
-        type: 'region',
-        region: [
-          [-2, 2],
-          [-2 * ratio, 2 * ratio],
-        ],
-      })
+      handleResetRegion()
     }
-  }, [state.region])
+  }, [handleResetRegion, state.region])
 
   useEffect(() => {
     window.addEventListener('resize', size)
@@ -314,10 +318,7 @@ export function App() {
             />
           </svg>
         </button>
-        <button
-          className="button"
-          onClick={() => dispatch({ type: 'resetRegion' })}
-        >
+        <button className="button" onClick={handleResetRegion}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
