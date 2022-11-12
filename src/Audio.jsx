@@ -134,14 +134,14 @@ export const Audio = ({
       await ctx.audioWorklet.addModule(recordProcessor)
 
       const workletNode = new AudioWorkletNode(ctx, 'recording-processor')
-      input.connect(workletNode)
 
-      // const filter = ctx.createBiquadFilter()
-      // filter.frequency.value = 60.0
-      // filter.type = filter.NOTCH
-      // filter.Q = 10.0
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(2, ctx.currentTime)
+      const dynamicsCompressor = ctx.createDynamicsCompressor()
+      input.connect(gain)
+      gain.connect(dynamicsCompressor)
+      dynamicsCompressor.connect(workletNode)
 
-      // input.connect(filter)
       const chunks = []
       workletNode.port.onmessage = ({ data }) => chunks.push(data)
       return async () => {
@@ -156,7 +156,9 @@ export const Audio = ({
           s += chunk.length
         }
 
-        input.disconnect(workletNode)
+        dynamicsCompressor.disconnect(workletNode)
+        gain.disconnect(dynamicsCompressor)
+        input.disconnect(gain)
         // Disconnect
         stream.getAudioTracks().forEach(track => {
           track.stop()

@@ -245,6 +245,10 @@ export function App() {
         setRecording(() => () => stopRecording())
       } else {
         const data = await recording()
+        const recDuration = data.length / state.sampleRate
+        if (recDuration > state.duration) {
+          dispatch({ type: 'duration', duration: recDuration })
+        }
         const n = recordings.length + 1
         setRecordings([
           ...recordings,
@@ -266,6 +270,7 @@ export function App() {
     recordAudio,
     recording,
     recordings,
+    state.duration,
     state.functions,
     state.sampleRate,
   ])
