@@ -56,10 +56,19 @@ function reducer(state, action) {
       const index = themesNames.indexOf(state.theme)
       return { ...state, theme: themesNames[(index + 1) % themesNames.length] }
     case 'volume':
+      if (!action.volume) {
+        return state
+      }
       return { ...state, volume: parseFloat(action.volume) }
     case 'duration':
+      if (!action.duration) {
+        return state
+      }
       return { ...state, duration: parseFloat(action.duration) }
     case 'sampleRate':
+      if (!action.sampleRate) {
+        return state
+      }
       return { ...state, sampleRate: parseInt(action.sampleRate) }
     case 'region':
       const region = action.region.map(minmax => minmax.map(parseFloat))
