@@ -123,6 +123,7 @@ onmessage = ({
           if (n >= 0 && n < rec.buffer.length) {
             return rec.buffer[n]
           }
+          return 0
         }
       })
     }
@@ -146,6 +147,7 @@ onmessage = ({
           }
           throw e
         }
+        values[i] = val
       } else {
         if (type === 'parametric') {
           const value = values[i]

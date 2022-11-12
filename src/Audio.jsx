@@ -17,17 +17,22 @@ export const Audio = ({
   const [audioContext, setAudioContext] = useState(null)
   const [masterGain, setMasterGain] = useState(null)
 
+  const createContext = useCallback(() => {
+    const audioContext = new AudioContext()
+    const masterGain = audioContext.createGain()
+    masterGain.connect(audioContext.destination)
+    setAudioContext(audioContext)
+    setMasterGain(masterGain)
+    return { audioContext, masterGain }
+  }, [])
+
   const playAudio = useCallback(async () => {
     let ctx = audioContext,
       master = masterGain
-    if (!ctx) {
-      ctx = new AudioContext()
-      master = ctx.createGain()
-      setAudioContext(ctx)
-      setMasterGain(master)
-      master.connect(ctx.destination)
-    }
 
+    if (!audioContext) {
+      ;({ audioContext: ctx, masterGain: master } = createContext())
+    }
     const count = duration * sampleRate
 
     const errors = []
@@ -106,6 +111,7 @@ export const Audio = ({
     }
   }, [
     audioContext,
+    createContext,
     duration,
     functions,
     loop,
@@ -117,15 +123,12 @@ export const Audio = ({
 
   const recordAudio = useCallback(
     async stream => {
-      let ctx = audioContext,
-        master = masterGain
-      if (!ctx) {
-        ctx = new AudioContext()
-        master = ctx.createGain()
-        setAudioContext(ctx)
-        setMasterGain(master)
-        master.connect(ctx.destination)
+      let ctx = audioContext
+
+      if (!audioContext) {
+        ;({ audioContext: ctx } = createContext())
       }
+
       const input = ctx.createMediaStreamSource(stream)
 
       await ctx.audioWorklet.addModule(recordProcessor)
@@ -140,13 +143,7 @@ export const Audio = ({
 
       // input.connect(filter)
       const chunks = []
-
-      const getData = ({ data }) => {
-        chunks.push(data)
-      }
-      // I like big bugs and I cannot lie
-      workletNode.port.onmessage = null
-      workletNode.port.addEventListener('message', getData)
+      workletNode.port.onmessage = ({ data }) => chunks.push(data)
       return async () => {
         const size = chunks.reduce((a, b) => a + b.length, 0)
         const buffer = new Float32Array(size)
@@ -158,7 +155,6 @@ export const Audio = ({
           }
           s += chunk.length
         }
-        workletNode.port.removeEventListener('message', getData)
 
         input.disconnect(workletNode)
         // Disconnect
@@ -168,7 +164,7 @@ export const Audio = ({
         return buffer
       }
     },
-    [audioContext, masterGain]
+    [audioContext, createContext]
   )
 
   useEffect(() => {
