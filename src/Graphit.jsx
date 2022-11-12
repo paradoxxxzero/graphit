@@ -169,7 +169,7 @@ export const Graphit = memo(
 
       for (let i = 0; i < data.length; i++) {
         if (!data[i]) continue
-        const { index, values, skips, err } = data[i]
+        const { index, values, err } = data[i]
 
         if (err) {
           errors.push(err)
@@ -178,10 +178,24 @@ export const Graphit = memo(
 
         ctx.strokeStyle = theme.colors[index]
         ctx.beginPath()
+        let lastOut = false,
+          lastI = 0,
+          lastJ = 0
         for (let n = 0; n < values.length; n += 2) {
           const i = x2i(values[n])
           const j = y2j(values[n + 1])
-          if (skips.includes(~~(n / 2))) {
+          if (i < 0 || i > canvas.width || j < 0 || j > canvas.height) {
+            lastI = i
+            lastJ = j
+            if (lastOut) {
+              continue
+            }
+            lastOut = true
+          } else if (lastOut) {
+            lastOut = false
+            ctx.moveTo(lastI, lastJ)
+          }
+          if (n === 0) {
             ctx.moveTo(i, j)
           } else {
             ctx.lineTo(i, j)

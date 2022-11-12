@@ -40,7 +40,7 @@ export const Audio = ({
       const data = await plotFunctions(
         functions,
         type => {
-          const values = allocate(count)
+          const values = allocate(count, 32)
           for (let j = 0; j < count; j++) {
             values[j] = j / sampleRate
           }

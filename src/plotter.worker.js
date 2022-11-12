@@ -103,8 +103,7 @@ const affected = {}
 onmessage = ({
   data: { index, funs, type, values, affects, recs, dimensions = 2, uuid },
 }) => {
-  let err = '',
-    skips = [0]
+  let err = ''
   try {
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
@@ -132,7 +131,6 @@ onmessage = ({
       // eslint-disable-next-line no-new-func
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-
     for (let i = 0; i < values.length; i += dimensions) {
       if (dimensions === 1) {
         const val = plotters[0](values[i])
@@ -182,5 +180,5 @@ onmessage = ({
     err = e
   }
 
-  postMessage({ index, values, type, skips, err, uuid }, [values.buffer])
+  postMessage({ index, values, type, err, uuid }, [values.buffer])
 }

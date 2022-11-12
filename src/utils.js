@@ -59,13 +59,12 @@ export function getFunctionType(fun) {
 
   return { type, funs: funs.map(f => f.trim()), recIndexes }
 }
-export const allocate = size => {
-  if (window.SharedArrayBuffer) {
-    console.log('Using SharedArrayBuffer')
-    return new Float32Array(new window.SharedArrayBuffer(size * 4))
-  } else {
-    return new Float32Array(size)
-  }
+export const allocate = (size, precision = 64) => {
+  // if (window.SharedArrayBuffer) {
+  //   console.log('Using SharedArrayBuffer')
+  //   return new Float64Array(new window.SharedArrayBuffer(size * 8))
+  // } else {
+  return new { 32: Float32Array, 64: Float64Array }[precision](size)
 }
 
 export function getValuesForType(type, x, y, i2x, j2y, options) {

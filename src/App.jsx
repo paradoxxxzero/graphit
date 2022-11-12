@@ -187,7 +187,7 @@ export function App() {
 
       const data = await plotFunctions(
         functions,
-        () => new Float32Array(1).map(() => 0),
+        () => new Float64Array(1).map(() => 0),
         recordings,
         { dimensions: 1 }
       )
