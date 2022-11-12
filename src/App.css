@@ -17,9 +17,10 @@
   display: flex;
   flex-direction: column;
 }
+
 .function input {
   margin: .5em 1em;
-  padding: 1em;
+  padding: 1em 3em 1em 1em;
   font-size: 1.5em;
   font-family: monospace;
   flex: 1;
@@ -27,16 +28,40 @@
   border: none;
   outline: none;
   min-width: 0;
+  position: relative;
 }
 .function input::selection {
   background: rgba(0, 0, 0, 0.3);
   color:rgba(255, 255, 255, 0.8)
 }
+
 .function .errors {
   margin: 1em;
   position: absolute;
   left: 1em;
   top: -2em;
+}
+
+.functionsText {
+  display: flex;
+  flex-direction: row;
+}
+
+.functionsText button {
+  position: absolute;
+  top: calc(50% - 0.5em);
+  right: 0.75em;
+  border: none;
+  background-color: transparent;
+  font-size: 2em;
+  line-height: 1em;
+  opacity: .5;
+}
+.functionsText button:hover {
+  opacity: .9;
+}
+.functionsText button:active {
+  opacity: 1;
 }
 
 .controls {
