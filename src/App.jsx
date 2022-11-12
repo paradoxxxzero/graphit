@@ -79,8 +79,12 @@ function reducer(state, action) {
         region[1][0] !== state.region[1][0] ||
         region[1][1] !== state.region[1][1]
       ) {
-        if (region[0][1] <= region[0][0] || region[1][1] <= region[1][0]) {
-          console.error('Inverted region', region)
+        if (
+          region[0][1] <= region[0][0] ||
+          region[1][1] <= region[1][0] ||
+          region.flat().some(r => isNaN(r))
+        ) {
+          console.error('Broken region', region)
           return state
         }
         return { ...state, region }
@@ -151,13 +155,15 @@ export function App() {
     const wrapper = wrapperRef.current
     const { width, height } = wrapper.getBoundingClientRect()
     const ratio = height / width
-    const region = state.region || [[-2, 2]]
-    region[1] = [
-      region[0][0] * ratio, // Keep ratio
-      region[0][1] * ratio,
-    ]
-
-    dispatch({ type: 'region', region })
+    if (!state.region) {
+      dispatch({
+        type: 'region',
+        region: [
+          [-2, 2],
+          [-2 * ratio, 2 * ratio],
+        ],
+      })
+    }
   }, [state.region])
 
   useEffect(() => {

@@ -212,11 +212,25 @@ export const Graphit = memo(
       const canvas = canvasRef.current
       const { width, height } = canvas.parentNode.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
+      const oldWidth = canvas.width
+      const oldHeight = canvas.height
+
       canvas.width = width * dpr
       canvas.height = height * dpr
+
+      const [[xmin, xmax], [ymin, ymax]] = region
+
+      const dx = (xmax - xmin) * (canvas.width / oldWidth - 1)
+      const dy = (ymax - ymin) * (canvas.height / oldHeight - 1)
+
+      onRegion([
+        [xmin - dx / 2, xmax + dx / 2],
+        [ymin - dy / 2, ymax + dy / 2],
+      ])
+
       const ctx = canvas.getContext('2d')
       ctx.lineWidth = 1.5 * dpr
-    }, [])
+    }, [onRegion, region])
 
     useEffect(() => {
       window.addEventListener('resize', size)
