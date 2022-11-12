@@ -27,15 +27,15 @@ export function orderRange(min, max, proj, minTick) {
 }
 
 export function getFunctionType(fun) {
-  let match, type, funs, recs
+  let match, type, funs, recIndexes
   if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*$/))) {
     type = 'linear'
     const fun = match[1]
     funs = [fun]
     if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
-      recs = []
+      recIndexes = []
       match.forEach(rec => {
-        recs.push(rec.match(/\$rec(\d)/)[1])
+        recIndexes.push(rec.match(/\$rec(\d)/)[1])
       })
     }
   } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*$/))) {
@@ -57,7 +57,7 @@ export function getFunctionType(fun) {
     funs = []
   }
 
-  return { type, funs: funs.map(f => f.trim()), recs }
+  return { type, funs: funs.map(f => f.trim()), recIndexes }
 }
 export const allocate = size => {
   if (window.SharedArrayBuffer) {

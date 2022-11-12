@@ -120,7 +120,7 @@ onmessage = ({
         }
         self[`$rec${i}`] = x => {
           const n = ~~(x * rec.sampleRate)
-          if (n > 0 && n < rec.buffer.length) {
+          if (n >= 0 && n < rec.buffer.length) {
             return rec.buffer[n]
           }
         }

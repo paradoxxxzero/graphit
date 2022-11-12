@@ -244,7 +244,9 @@ export function App() {
         if (!state.functions.includes(`$rec${n}(`)) {
           dispatch({
             type: 'functions',
-            functions: `${state.functions.trim()} ; y = $rec${n}(x)`,
+            functions: `${state.functions.trim()} ${
+              state.functions.trim() && '; '
+            }y = $rec${n}(x)`,
           })
         }
         setRecording(null)

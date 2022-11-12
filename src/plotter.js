@@ -38,12 +38,14 @@ export const plotFunctions = async (
   const functionsTypeValues = []
   // Filter plot functions and affects
   for (let i = 0; i < functionsText.length; i++) {
-    let { type, funs, recs } = getFunctionType(functionsText[i])
+    let recs
+    let { type, funs, recIndexes } = getFunctionType(functionsText[i])
     if (type === 'affect') {
       affects.push(funs)
     } else if (type !== 'unknown') {
-      if (recs) {
-        recs.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
+      if (recIndexes) {
+        recs = {}
+        recIndexes.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
       }
       const values = typeToValues(type)
       functionsTypeValues.push({ type, funs, values, recs })
