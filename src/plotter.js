@@ -45,14 +45,15 @@ export const plotFunctions = async (
       region,
       precisions
     )
-    if (type === 'affect') {
-      affects.push(funs)
-    }
     if (recIndexes) {
       recs = {}
       recIndexes.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
     }
-    functionsTypeValues.push({ type, funs, min, max, step, recs })
+    if (type === 'affect') {
+      affects.push(funs)
+    } else {
+      functionsTypeValues.push({ type, funs, min, max, step, recs })
+    }
   }
   // Create missing workers
   for (let i = 0; i < functionsTypeValues.length; i++) {
