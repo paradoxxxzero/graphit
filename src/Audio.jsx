@@ -39,10 +39,10 @@ export const Audio = ({
       const data = await plotFunctions(
         functions,
         [
-          [0, count / sampleRate],
-          [0, count / sampleRate],
+          [0, duration],
+          [0, duration],
         ],
-        [1 / sampleRate, 1 / sampleRate],
+        [1 / (duration * sampleRate), 1 / (duration * sampleRate)],
         recordings,
         { dimensions: 1 }
       )
