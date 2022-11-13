@@ -17,6 +17,7 @@ import themes from './themes'
 const initialState = {
   theme: 'tango',
   duration: 1,
+  lineWidth: 1.5,
   sampleRate: 44100,
   volume: 0.5,
   region: null,
@@ -55,6 +56,11 @@ function reducer(state, action) {
       const themesNames = Object.keys(themes)
       const index = themesNames.indexOf(state.theme)
       return { ...state, theme: themesNames[(index + 1) % themesNames.length] }
+    case 'lineWidth':
+      if (!action.lineWidth) {
+        return state
+      }
+      return { ...state, lineWidth: parseFloat(action.lineWidth) }
     case 'volume':
       if (!action.volume) {
         return state
@@ -420,7 +426,11 @@ export function App() {
           </button>
         ) : null}
         {saveUrl ? (
-          <a className="button" href={saveUrl} download="graphit.wav">
+          <a
+            className="button"
+            href={saveUrl}
+            download={`graphit-${new Date().getTime()}.wav`}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="1em"
@@ -457,6 +467,7 @@ export function App() {
             theme={theme}
             region={state.region}
             recordings={recordings}
+            lineWidth={state.lineWidth}
             onRegion={region => dispatch({ type: 'region', region })}
             hide={displaySpectrogram}
           ></Graphit>
@@ -547,6 +558,18 @@ export function App() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="lineWidth">Line Width</label>
+                <input
+                  type="number"
+                  name="lineWidth"
+                  step={0.1}
+                  value={state.lineWidth}
+                  onChange={e =>
+                    dispatch({ type: 'lineWidth', lineWidth: e.target.value })
+                  }
+                />
               </div>
               <h2>Audio</h2>
               <div className="form-group">

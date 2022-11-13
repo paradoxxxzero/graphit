@@ -16,7 +16,15 @@ const TICK_SIZE = 10
 const MIN_TICK = 200
 
 export const Graphit = memo(
-  function ({ functions, theme, region, hide, recordings, onRegion }) {
+  function ({
+    functions,
+    theme,
+    region,
+    lineWidth,
+    hide,
+    recordings,
+    onRegion,
+  }) {
     const canvasRef = useRef(null)
 
     const i2x = useCallback(
@@ -94,12 +102,15 @@ export const Graphit = memo(
     const plot = useCallback(async () => {
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
+      const dpr = window.devicePixelRatio || 1
+
       const [[xmin, xmax], [ymin, ymax]] = region
       const redraw = () => {
         // Clear background
         ctx.fillStyle = theme.background
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+        ctx.lineWidth = lineWidth * dpr
         // Draw axes
         ctx.strokeStyle = theme.axis
         ctx.beginPath()
@@ -214,6 +225,7 @@ export const Graphit = memo(
       theme.tick,
       theme.foreground,
       theme.colors,
+      lineWidth,
       x2i,
       y2j,
       dx2di,
@@ -224,14 +236,19 @@ export const Graphit = memo(
 
     const size = useCallback(() => {
       const canvas = canvasRef.current
-      const { width, height } = canvas.parentNode.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
+      const { width, height } = canvas.parentNode.getBoundingClientRect()
 
       const oldWidth = canvas.width
       const oldHeight = canvas.height
 
       canvas.width = width * dpr
       canvas.height = height * dpr
+
+      // Don't resize region if it was the initial one
+      if (oldWidth === 300 && oldHeight === 150) {
+        return
+      }
 
       const [[xmin, xmax], [ymin, ymax]] = region
       const dx = (xmax - xmin) * (canvas.width / oldWidth - 1)
@@ -241,8 +258,6 @@ export const Graphit = memo(
         [xmin - dx / 2, xmax + dx / 2],
         [ymin - dy / 2, ymax + dy / 2],
       ])
-      const ctx = canvas.getContext('2d')
-      ctx.lineWidth = 1.5 * dpr
     }, [onRegion, region])
 
     useEffect(() => {
