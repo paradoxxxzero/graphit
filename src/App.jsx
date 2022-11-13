@@ -30,24 +30,6 @@ const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'all':
-      return {
-        ...state,
-        functions: action.functions || state.functions,
-        theme:
-          (Object.keys(themes).includes(action.theme) && action.theme) ||
-          state.theme,
-        volume: parseFloat(action.volume) || state.volume,
-        duration: parseFloat(action.duration) || state.duration,
-        sampleRate: parseInt(action.sampleRate) || state.sampleRate,
-        region: action.region
-          ? action.region.map(minmax => minmax.map(parseFloat))
-          : state.region,
-        loop:
-          typeof action.loop !== 'undefined'
-            ? action.loop === 'true'
-            : state.loop,
-      }
     case 'functions':
       return { ...state, functions: action.functions }
     case 'theme':
@@ -139,12 +121,18 @@ const pushState = debounce(state => {
 
 function urlMiddleware(reducer) {
   return (state, action) => {
-    const newState = reducer(state, action)
+    if (action.type === 'all') {
+      Object.keys(initialState).forEach(key => {
+        state = reducer(state, { type: key, [key]: action[key] })
+      })
+    } else {
+      state = reducer(state, action)
 
-    if (newState.region && action.type !== 'all') {
-      pushState(newState)
+      if (state.region) {
+        pushState(state)
+      }
     }
-    return newState
+    return state
   }
 }
 
