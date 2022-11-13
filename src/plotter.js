@@ -1,5 +1,5 @@
 import Plotter from './plotter.worker.js?worker'
-import { getFunctionType } from './utils'
+import { getFunctionParams } from './utils'
 
 const workers = []
 
@@ -29,7 +29,8 @@ const sendToPlotter = async (index, message, transfer) => {
 
 export const plotFunctions = async (
   functions,
-  typeToValues,
+  region,
+  precisions,
   recordings,
   options = {}
 ) => {
@@ -39,17 +40,19 @@ export const plotFunctions = async (
   // Filter plot functions and affects
   for (let i = 0; i < functionsText.length; i++) {
     let recs
-    let { type, funs, recIndexes } = getFunctionType(functionsText[i])
+    let { type, funs, min, max, step, recIndexes } = getFunctionParams(
+      functionsText[i],
+      region,
+      precisions
+    )
     if (type === 'affect') {
       affects.push(funs)
-    } else if (type !== 'unknown') {
-      if (recIndexes) {
-        recs = {}
-        recIndexes.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
-      }
-      const values = typeToValues(type)
-      functionsTypeValues.push({ type, funs, values, recs })
     }
+    if (recIndexes) {
+      recs = {}
+      recIndexes.map(i => ~~i).forEach(i => (recs[i] = recordings[i - 1]))
+    }
+    functionsTypeValues.push({ type, funs, min, max, step, recs })
   }
   // Create missing workers
   for (let i = 0; i < functionsTypeValues.length; i++) {
@@ -61,12 +64,19 @@ export const plotFunctions = async (
 
   // Plot functions
   const data = await Promise.all(
-    functionsTypeValues.map(({ index, type, funs, values, recs }) =>
-      sendToPlotter(
+    functionsTypeValues.map(({ index, type, funs, min, max, step, recs }) =>
+      sendToPlotter(index, {
         index,
-        { index, type, funs, values, affects, recs, ...options },
-        [values.buffer]
-      )
+        type,
+        funs,
+        min,
+        max,
+        step,
+        region,
+        affects,
+        recs,
+        ...options,
+      })
     )
   )
   return data

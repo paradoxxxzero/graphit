@@ -23,7 +23,7 @@ const initialState = {
   region: null,
   loop: false,
   functions:
-    'y = sin(pow(x, 4))/x ; y = cos(pow(2, sin(x**2))) ; r = cos(o) * sin(o); { x = cos(3*t)*.75, y = sin(2*t)*.75 }',
+    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r=.25* (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi ! pi*1e-4;k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi ! .0001',
 }
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
@@ -96,7 +96,7 @@ function reducer(state, action) {
         ],
       }
     case 'loop':
-      return { ...state, loop: action.loop }
+      return { ...state, loop: action.loop && action.loop !== 'false' }
     default:
       throw new Error()
   }
@@ -181,9 +181,15 @@ export function App() {
 
       const data = await plotFunctions(
         functions,
-        () => new Float64Array(1).map(() => 0),
+        [
+          [0, 1],
+          [0, 1],
+        ],
+        [1, 1],
         recordings,
-        { dimensions: 1 }
+        {
+          dimensions: 1,
+        }
       )
       const errors = data.map(d => d.err).filter(x => x)
       if (errors.length) {

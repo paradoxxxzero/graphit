@@ -26,92 +26,75 @@ export function orderRange(min, max, proj, minTick) {
   }
 }
 
-export function getFunctionType(fun) {
-  let match, type, funs, recIndexes
+export function getFunctionParams(fun, region, precisions) {
+  let match,
+    type,
+    funs,
+    recIndexes,
+    min = null,
+    max = null,
+    step = null
+  if ((match = fun.match(/(.+)@\s*(.+)\s*->\s*([^!]+)\s*(!\s*(.+)\s*$)?/))) {
+    fun = match[1]
+    min = match[2]
+    max = match[3]
+    if (match[4]) {
+      step = match[5]
+    }
+  }
+  if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
+    recIndexes = []
+    match.forEach(rec => {
+      recIndexes.push(rec.match(/\$rec(\d)/)[1])
+    })
+  }
   if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*$/))) {
     type = 'linear'
-    const fun = match[1]
-    funs = [fun]
-    if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
-      recIndexes = []
-      match.forEach(rec => {
-        recIndexes.push(rec.match(/\$rec(\d)/)[1])
-      })
+    funs = [match[1]]
+    if (min === null) {
+      ;[[min, max]] = region
+    }
+    if (step === null) {
+      step = precisions[0]
     }
   } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*$/))) {
     type = 'linear-horizontal'
     funs = [match[1]]
+    if (min === null) {
+      ;[, [min, max]] = region
+    }
+    if (step === null) {
+      step = precisions[1]
+    }
   } else if ((match = fun.match(/^\s*r\s*=\s*(.+)\s*$/))) {
     type = 'polar'
     funs = [match[1]]
+    if (min === null) {
+      ;[min, max] = [0, 2 * Math.PI]
+    }
+    if (step === null) {
+      step = Math.min(...precisions)
+    }
   } else if (
-    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}$/))
+    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}\s*$/))
   ) {
     type = 'parametric'
     funs = [match[1], match[2]]
-  } else if ((match = fun.match(/^\s*(.+)\s*=\s*(.+)\s*$/))) {
+    if (min === null) {
+      ;[min, max] = [0, 1]
+    }
+    if (step === null) {
+      step = Math.min(...precisions)
+    }
+  } else if ((match = fun.match(/^\s*(\S+)\s*=\s*(.+)\s*$/))) {
     type = 'affect'
     funs = [match[1], match[2]]
+    ;[min, max] = [0, 1]
+    step = 1
   } else {
     type = 'unknown'
-    funs = []
+    funs = [fun]
   }
 
-  return { type, funs: funs.map(f => f.trim()), recIndexes }
-}
-export const allocate = (size, precision = 64) => {
-  // if (window.SharedArrayBuffer) {
-  //   console.log('Using SharedArrayBuffer')
-  //   return new Float64Array(new window.SharedArrayBuffer(size * 8))
-  // } else {
-  return new { 32: Float32Array, 64: Float64Array }[precision](size)
-}
-
-export function getValuesForType(type, x, y, i2x, j2y, options) {
-  let values,
-    n = 0
-
-  switch (type) {
-    case 'linear':
-      values = allocate((2 * x) / options.precision)
-
-      for (let i = 0; i < x; i += options.precision) {
-        values[n] = i2x(i)
-        n += 2
-      }
-      break
-    case 'linear-horizontal':
-      values = allocate((2 * y) / options.precision)
-
-      for (let j = 0; j < y; j += options.precision) {
-        values[n + 1] = j2y(j)
-        n += 2
-      }
-      break
-
-    case 'polar':
-      values = allocate((2 * options.polarMax) / options.polarPrecision)
-      for (let o = 0; o < options.polarMax; o += options.polarPrecision) {
-        values[n] = o
-        n += 2
-      }
-      break
-    case 'parametric':
-      values = allocate(
-        (2 * options.parametricMax) / options.parametricPrecision
-      )
-      for (
-        let t = 0;
-        t < options.parametricMax;
-        t += options.parametricPrecision
-      ) {
-        values[n] = t
-        n += 2
-      }
-      break
-    case 'unknown':
-    default:
-      values = null
-  }
-  return values
+  return { type, funs: funs.map(f => f.trim()), min, max, step, recIndexes }
 }

@@ -2,15 +2,7 @@ import { useGesture } from '@use-gesture/react'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import './Graphit.css'
 import { plotFunctions } from './plotter'
-import { clamp, getValuesForType, lerp, orderRange } from './utils'
-
-const typeOptions = {
-  precision: 1,
-  polarMax: 2 * Math.PI,
-  polarPrecision: (2 * Math.PI) / 1028,
-  parametricMax: 10,
-  parametricPrecision: 10 / 512,
-}
+import { clamp, lerp, orderRange } from './utils'
 
 const TICK_SIZE = 10
 const MIN_TICK = 200
@@ -163,15 +155,8 @@ export const Graphit = memo(
       }
       const data = await plotFunctions(
         functions,
-        type =>
-          getValuesForType(
-            type,
-            canvas.width,
-            canvas.height,
-            i2x,
-            j2y,
-            typeOptions
-          ),
+        region,
+        [1 / canvas.width, 1 / canvas.height],
         recordings
       )
       const errors = []
@@ -230,8 +215,6 @@ export const Graphit = memo(
       y2j,
       dx2di,
       dy2dj,
-      i2x,
-      j2y,
     ])
 
     const size = useCallback(() => {

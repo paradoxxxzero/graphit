@@ -1,3 +1,4 @@
+/* eslint-disable no-new-func */
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
   linear: 'x',
@@ -101,13 +102,42 @@ self.__doc__ = {
 const affected = {}
 
 onmessage = ({
-  data: { index, funs, type, values, affects, recs, dimensions = 2, uuid },
+  data: {
+    index,
+    funs,
+    type,
+    min,
+    max,
+    step,
+    region,
+    affects,
+    recs,
+    dimensions = 2,
+    uuid,
+  },
 }) => {
-  let err = ''
+  let err = '',
+    values = null
   try {
+    if (type === 'unknown') {
+      throw new Error(`Unknow function type ${funs.join(', ')}`)
+    }
+    if (typeof min === 'string') {
+      min = new Function('return ' + min)()
+    }
+    if (typeof max === 'string') {
+      max = new Function('return ' + max)()
+    }
+    if (typeof step === 'string') {
+      step = new Function('return ' + step)()
+    }
+    step = (max - min) * step
+    if (step < 1e-9) {
+      throw new Error(`Invalid step ${step}`)
+    }
+    console.log(min, max, step)
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
-      // eslint-disable-next-line no-new-func
       const value = new Function('', 'return ' + valueText)()
       affected[name] = self[name]
       self[name] = value
@@ -128,12 +158,13 @@ onmessage = ({
     }
 
     const plotters = funs.map(
-      // eslint-disable-next-line no-new-func
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    for (let i = 0; i < values.length; i += dimensions) {
+    values = new Float32Array(~~(((max - min) / step) * dimensions))
+    let i = 0
+    for (let n = min; n < max; n += step) {
       if (dimensions === 1) {
-        const val = plotters[0](values[i])
+        const val = plotters[0](n)
         if (typeof val !== 'number') {
           let e
           if (typeof val === 'function') {
@@ -145,24 +176,21 @@ onmessage = ({
           }
           throw e
         }
-        values[i] = val
+        values[i++] = val
       } else {
         if (type === 'parametric') {
-          const value = values[i]
-          values[i] = plotters[0](value)
-          values[i + 1] = plotters[1](value)
+          values[i++] = plotters[0](n)
+          values[i++] = plotters[1](n)
+        } else if (type === 'polar') {
+          const r = plotters[0](n)
+          values[i++] = r * Math.cos(n)
+          values[i++] = r * Math.sin(n)
+        } else if (type === 'linear-horizontal') {
+          values[i++] = plotters[0](n)
+          values[i++] = n
         } else {
-          if (type === 'linear-horizontal') {
-            values[i] = plotters[0](values[i + 1])
-          } else {
-            values[i + 1] = plotters[0](values[i])
-
-            if (type === 'polar') {
-              const value = values[i]
-              values[i] = values[i + 1] * Math.cos(value)
-              values[i + 1] *= Math.sin(value)
-            }
-          }
+          values[i++] = n
+          values[i++] = plotters[0](n)
         }
       }
     }
@@ -180,5 +208,5 @@ onmessage = ({
     err = e
   }
 
-  postMessage({ index, values, type, err, uuid }, [values.buffer])
+  postMessage({ index, values, type, err, uuid }, values && [values.buffer])
 }

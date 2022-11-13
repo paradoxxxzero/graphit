@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { plotFunctions } from './plotter'
-import { allocate } from './utils'
 import recordProcessor from './recording.worklet?url'
 
 export const Audio = ({
@@ -39,13 +38,11 @@ export const Audio = ({
       const errors = []
       const data = await plotFunctions(
         functions,
-        type => {
-          const values = allocate(count, 32)
-          for (let j = 0; j < count; j++) {
-            values[j] = j / sampleRate
-          }
-          return values
-        },
+        [
+          [0, count / sampleRate],
+          [0, count / sampleRate],
+        ],
+        [1 / sampleRate, 1 / sampleRate],
         recordings,
         { dimensions: 1 }
       )
