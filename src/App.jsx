@@ -23,7 +23,7 @@ const initialState = {
   region: null,
   loop: false,
   functions:
-    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r=.25* (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi ! pi*1e-4;k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi ! .0001',
+    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi ! pi*1e-4 ; k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi ! .0001',
 }
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
@@ -491,6 +491,11 @@ export function App() {
           <input
             type="text"
             value={functionsText}
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+            translate="no"
+            autoFocus
             style={{
               color: errors.length ? theme.error : theme.foreground,
             }}
