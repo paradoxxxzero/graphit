@@ -56,7 +56,7 @@ export const Audio = ({
           continue
         }
         const buffer = ctx.createBuffer(1, count, sampleRate)
-        buffer.copyToChannel(values, 0)
+        buffer.copyToChannel(values[0], 0)
 
         const gain = ctx.createGain()
 

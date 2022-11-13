@@ -34,14 +34,16 @@ export function getFunctionParams(fun, region, precisions) {
     min = null,
     max = null,
     step = null
-  if ((match = fun.match(/(.+)@\s*(.+)\s*->\s*([^!]+)\s*(!\s*(.+)\s*$)?/))) {
+  if ((match = fun.match(/(.+)!\s*(.+)\s*$/))) {
+    fun = match[1]
+    step = match[2]
+  }
+  if ((match = fun.match(/(.+)@\s*(.+)\s*->\s*(.+)\s*/))) {
     fun = match[1]
     min = match[2]
     max = match[3]
-    if (match[4]) {
-      step = match[5]
-    }
   }
+
   if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
     recIndexes = []
     match.forEach(rec => {

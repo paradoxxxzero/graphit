@@ -19,28 +19,12 @@ export const Graphit = memo(
   }) {
     const canvasRef = useRef(null)
 
-    const i2x = useCallback(
-      i => {
-        const { width } = canvasRef.current
-        const [[xmin, xmax]] = region
-        return xmin + (xmax - xmin) * (i / width)
-      },
-      [region]
-    )
+    // TODO: Get rid of these
     const x2i = useCallback(
       x => {
         const { width } = canvasRef.current
         const [[xmin, xmax]] = region
         return (x - xmin) * (width / (xmax - xmin))
-      },
-      [region]
-    )
-
-    const j2y = useCallback(
-      j => {
-        const { height } = canvasRef.current
-        const [, [ymin, ymax]] = region
-        return ymin + (ymax - ymin) * ((height - j) / height)
       },
       [region]
     )
@@ -166,38 +150,26 @@ export const Graphit = memo(
       for (let i = 0; i < data.length; i++) {
         if (!data[i]) continue
         const { index, values, err } = data[i]
-
         if (err) {
           errors.push(err)
           continue
         }
-
         ctx.strokeStyle = theme.colors[index]
-        ctx.beginPath()
-        let lastOut = false,
-          lastI = 0,
-          lastJ = 0
-        for (let n = 0; n < values.length; n += 2) {
-          const i = x2i(values[n])
-          const j = y2j(values[n + 1])
-          if (i < 0 || i > canvas.width || j < 0 || j > canvas.height) {
-            lastI = i
-            lastJ = j
-            if (lastOut) {
-              continue
+
+        for (let d = 0; d < values.length; d++) {
+          ctx.beginPath()
+          const domain = values[d]
+          for (let n = 0; n < domain.length; n += 2) {
+            const i = x2i(domain[n])
+            const j = y2j(domain[n + 1])
+            if (n === 0) {
+              ctx.moveTo(i, j)
+            } else {
+              ctx.lineTo(i, j)
             }
-            lastOut = true
-          } else if (lastOut) {
-            lastOut = false
-            ctx.moveTo(lastI, lastJ)
           }
-          if (n === 0) {
-            ctx.moveTo(i, j)
-          } else {
-            ctx.lineTo(i, j)
-          }
+          ctx.stroke()
         }
-        ctx.stroke()
       }
       console.error(...errors)
       return true
@@ -338,16 +310,6 @@ export const Graphit = memo(
     )
   },
   (prev, next) => {
-    // console.log(
-    //   prev.fun === next.fun,
-    //   prev.theme === next.theme,
-    //   prev.onRegion === next.onRegion,
-    //   prev.onError === next.onError,
-    //   prev.region[0][0] === next.region[0][0],
-    //   prev.region[0][1] === next.region[0][1],
-    //   prev.region[1][0] === next.region[1][0],
-    //   prev.region[1][1] === next.region[1][1]
-    // )
     return (
       prev.fun === next.fun &&
       prev.theme === next.theme &&

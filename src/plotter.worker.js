@@ -117,7 +117,7 @@ onmessage = ({
   },
 }) => {
   let err = '',
-    values = null
+    values = []
   try {
     if (type === 'unknown') {
       throw new Error(`Unknow function type ${funs.join(', ')}`)
@@ -135,7 +135,6 @@ onmessage = ({
     if (step < 1e-9) {
       throw new Error(`Invalid step ${step}`)
     }
-    console.log(min, max, step)
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
       const value = new Function('', 'return ' + valueText)()
@@ -156,12 +155,15 @@ onmessage = ({
         }
       })
     }
-
+    const [[xmin, xmax], [ymin, ymax]] = region
+    let lastOutX = null,
+      lastOutY = null,
+      lastOut = true
+    const domains = []
+    let domain = []
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    values = new Float32Array(~~(((max - min) / step) * dimensions))
-    let i = 0
     for (let n = min; n < max; n += step) {
       if (dimensions === 1) {
         const val = plotters[0](n)
@@ -176,24 +178,52 @@ onmessage = ({
           }
           throw e
         }
-        values[i++] = val
+        domain.push(val)
       } else {
+        let x, y
         if (type === 'parametric') {
-          values[i++] = plotters[0](n)
-          values[i++] = plotters[1](n)
+          x = plotters[0](n)
+          y = plotters[1](n)
         } else if (type === 'polar') {
           const r = plotters[0](n)
-          values[i++] = r * Math.cos(n)
-          values[i++] = r * Math.sin(n)
+          x = r * Math.cos(n)
+          y = r * Math.sin(n)
         } else if (type === 'linear-horizontal') {
-          values[i++] = plotters[0](n)
-          values[i++] = n
+          x = plotters[0](n)
+          y = n
         } else {
-          values[i++] = n
-          values[i++] = plotters[0](n)
+          x = n
+          y = plotters[0](n)
         }
+        if (x < xmin || x > xmax || y < ymin || y > ymax) {
+          // Out of range
+          lastOutX = x
+          lastOutY = y
+          if (lastOut) {
+            continue
+          }
+          // Coming out of range
+          lastOut = true
+          // Ending last domain
+        } else if (lastOut) {
+          // Coming back in range
+          lastOut = false
+          // Beginning new domain
+          if (domain.length) {
+            domains.push(domain)
+            domain = []
+          }
+          if (lastOutX !== null) {
+            domain.push(lastOutX, lastOutY)
+          }
+        }
+        domain.push(x, y)
       }
     }
+    if (domain.length) {
+      domains.push(domain)
+    }
+    values = domains.map(domain => new Float32Array(domain))
     if (recs) {
       Object.keys(recs).forEach(i => {
         delete self[`$rec${i}`]
@@ -208,5 +238,8 @@ onmessage = ({
     err = e
   }
 
-  postMessage({ index, values, type, err, uuid }, values && [values.buffer])
+  postMessage(
+    { index, values, type, err, uuid },
+    values.map(v => v.buffer)
+  )
 }
