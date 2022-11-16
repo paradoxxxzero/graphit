@@ -23,7 +23,7 @@ const initialState = {
   region: null,
   loop: false,
   functions:
-    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1e-4 ; k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! .0001',
+    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1000 ; k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! 1000',
 }
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
@@ -177,6 +177,7 @@ export function App() {
 
   const handleFunctions = useCallback(
     async functions => {
+      console.log(functions)
       setFunctionsText(functions)
 
       const data = await plotFunctions(
@@ -266,14 +267,16 @@ export function App() {
           ...recordings,
           { buffer: data, sampleRate: state.sampleRate },
         ])
-        if (!state.functions.includes(`$rec${n}(`)) {
-          setFunctionsText(
-            `${functionsText.trim()} ${
-              functionsText.trim() && '; '
-            }y = $rec${n}(x)`
-          )
-        }
         setRecording(null)
+        if (!functionsText.includes(`$rec${n}(`)) {
+          const newFunctionsText = `${functionsText.trim()}${
+            functionsText.trim() && ' ; '
+          }y = $rec${n}(x)`
+          if (functionsText === state.functions || functionsText === '') {
+            dispatch({ type: 'functions', functions: newFunctionsText })
+          }
+          setFunctionsText(newFunctionsText)
+        }
       }
     }
   }, [

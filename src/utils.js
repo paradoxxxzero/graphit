@@ -6,6 +6,10 @@ export function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v))
 }
 
+export async function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 export function orderRange(min, max, proj, minTick) {
   const range = max - min
   const order = ~~Math.log10(range)
@@ -61,8 +65,10 @@ export function getFunctionParams(fun, region, precisions) {
     if (min === null) {
       ;[[min, max]] = region
     }
-    if (samples === null) {
+    if (samples === 'size') {
       samples = precisions[0]
+    } else if (samples === null) {
+      samples = 'auto'
     }
   } else if ((match = fun.match(/^\s*x\s*=(.+)$/))) {
     type = 'linear-horizontal'
@@ -70,8 +76,10 @@ export function getFunctionParams(fun, region, precisions) {
     if (min === null) {
       ;[, [min, max]] = region
     }
-    if (samples === null) {
+    if (samples === 'size') {
       samples = precisions[1]
+    } else if (samples === null) {
+      samples = 'auto'
     }
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'

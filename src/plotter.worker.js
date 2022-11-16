@@ -16,7 +16,7 @@ for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
 const PI = self.PI
 const TAU = (self.tau = self.TAU = self.PI * 2)
 const ETA = (self.eta = self.ETA = self.PI / 2)
-
+self.ln = self.log
 self.osc = (freq, x, type = 'sine') =>
   x < 0
     ? 0
@@ -105,17 +105,65 @@ self.__doc__ = {
 const auto = {
   sampling: 1000,
   pass: 32,
-  precision: PI / 2 ** 11,
-  straightness: PI / 2 ** 8,
-  supplenessPrecision: ETA,
-  suppleness: PI / 2 ** 12,
-  maxPoints: 2 ** 14,
+  precision: PI / 32,
+  straightness: PI / 1000,
+  supplenessPrecision: ETA / 2,
+  suppleness: PI / 2000,
+  maxPoints: 10000,
+}
+
+const pushBounded = (points, x, y, region, type) => {
+  if (
+    isNaN(x) ||
+    isNaN(y) ||
+    x < region[0][0] ||
+    x > region[0][1] ||
+    y < region[1][0] ||
+    y > region[1][1]
+  ) {
+    // Out of range
+    if (
+      !points.out?.length ||
+      ((isNaN(x) || isNaN(y)) && !isNaN(points.out[0]) && !isNaN(points.out[1]))
+    ) {
+      // Adding first points.out of range point
+      points.push(x, y)
+    }
+    points.out = [x, y]
+    return
+  }
+  if (points.out?.length) {
+    // In range but was points.out, adding last points.out of range point
+    if (points.length > 1) {
+      // Assuming assymptote:
+      if (type === 'linear-horizontal') {
+        points.push(NaN, points[points.length - 1])
+      } else if (type === 'linear') {
+        points.push(points[points.length - 2], NaN)
+      }
+    }
+    points.push(...points.out)
+    points.out.splice(0)
+  }
+  points.push(x, y)
 }
 
 const adaptative = (points, plotters, type, region) => {
   const [[xmin, xmax], [ymin, ymax]] = region
+  const newPoints = []
+  const push = (x, y) => pushBounded(newPoints, x, y, region, type)
+  const divide = (x1, y1, x2, y2, k) => {
+    if (type === 'linear') {
+      const x = k * x1 + (1 - k) * x2
+      const y = plotters[0](x)
+      push(x, y)
+    } else if (type === 'linear-horizontal') {
+      const y = k * y1 + (1 - k) * y2
+      const x = plotters[0](y)
+      push(x, y)
+    }
+  }
   const k = (ymax - ymin) / (xmax - xmin)
-  let newPoints = []
   // TODO: Handle last points
   // TODO: Handle domains
   // TODO: Handle last outs
@@ -127,6 +175,25 @@ const adaptative = (points, plotters, type, region) => {
     const y2 = points[i + 3]
     const x3 = points[i + 4]
     const y3 = points[i + 5]
+    if (isNaN(y1)) {
+      push(x1, y1)
+      divide(x1, y1, x2, y2, 3 / 4)
+      push(x2, y2)
+      continue
+    }
+    if (isNaN(y2)) {
+      push(x1, y1)
+      divide(x1, y1, x2, y2, 1 / 4)
+      push(x2, y2)
+      divide(x2, y2, x3, y3, 3 / 4)
+      continue
+    }
+    if (isNaN(y3)) {
+      push(x1, y1)
+      push(x2, y2)
+      divide(x2, y2, x3, y3, 1 / 4)
+      continue
+    }
     const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
     const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
@@ -135,7 +202,7 @@ const adaptative = (points, plotters, type, region) => {
     const subdivide = absAngle > auto.precision
 
     if (isStraight) {
-      newPoints.push(x1, y1)
+      push(x1, y1)
       // Skip middle point
       continue
     }
@@ -145,62 +212,62 @@ const adaptative = (points, plotters, type, region) => {
         angle12 < -self.eta + auto.suppleness)
     ) {
       // Skip first point since they are vertically close
-      newPoints.push(x2, y2)
+      push(x2, y2)
       // Add a point after the angle
-      const x231 = (x2 * 3 + x3) / 4
-      const y231 = plotters[0](x231)
-      // // if (x231 > xmin && x231 < xmax && y231 > ymin && y231 < ymax) {
-      newPoints.push(x231, y231)
-      // }
-      const x232 = (x2 + x3 * 3) / 4
-      const y232 = plotters[0](x232)
-      // // if (x232 > xmin && x232 < xmax && y232 > ymin && y232 < ymax) {
-      newPoints.push(x232, y232)
-      // }
+      divide(x2, y2, x3, y3, 3 / 4)
+      divide(x2, y2, x3, y3, 1 / 4)
       continue
     }
 
-    // const skip =
-    //   self.eta - angle12 < auto.straightness &&
-    //   self.eta - angle23 < auto.straightness
     // This only works on linear (vertical)
-    newPoints.push(x1, y1)
+    push(x1, y1)
+
     if (subdivide) {
-      const x12 = (x1 + x2) / 2
-      const y12 = plotters[0](x12)
-      // if (x12 > xmin && x12 < xmax && y12 > ymin && y12 < ymax) {
-      newPoints.push(x12, y12)
-      // }
+      divide(x1, y1, x2, y2, 1 / 2)
     }
-    // if (self.eta - angle23 > auto.straightness) {
-    newPoints.push(x2, y2)
-    // }
+
+    push(x2, y2)
+
     if (subdivide) {
-      const x23 = (x2 + x3) / 2
-      const y23 = plotters[0](x23)
-      // if (x23 > xmin && x23 < xmax && y23 > ymin && y23 < ymax) {
-      newPoints.push(x23, y23)
-      // }
+      divide(x2, y2, x3, y3, 1 / 2)
     }
   }
-
-  for (let j = i; j < points.length; j++) {
-    newPoints.push(points[j])
+  for (let j = i; j < points.length; j += 2) {
+    push(points[j], points[j + 1])
   }
   return newPoints
 }
+const same = (points1, points2) => {
+  if (!points2 || points1.length !== points2.length) {
+    return false
+  }
+  const length = points1.length
+  for (let i = 0; i < length; i++) {
+    if (points1[i] !== points2[i]) {
+      return false
+    }
+  }
+  return true
+}
 
 const adaptativePlot = (points, plotters, type, region) => {
-  const iterations = []
+  const pointsLengths = [points.length]
+  let lastPoints = points
+  let lastLastPoints = null
   for (let i = 0; i < auto.pass; i++) {
     if (points.length > auto.maxPoints) {
-      console.warn("Max points reached, can't subdivide anymore")
+      // console.warn("Max points reached, can't subdivide anymore")
       break
     }
-    iterations.push(points.length / 2)
     points = adaptative(points, plotters, type, region)
+    if (same(points, lastPoints) || same(points, lastLastPoints)) {
+      break
+    }
+    lastLastPoints = lastPoints
+    lastPoints = points
+    pointsLengths.push(points.length)
   }
-  console.log(iterations.join('->'))
+  console.log(pointsLengths)
   return points
 }
 
@@ -274,7 +341,6 @@ onmessage = ({
         }
       })
     }
-    const [[xmin, xmax], [ymin, ymax]] = region
 
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
@@ -298,7 +364,6 @@ onmessage = ({
         values[i++] = val
       }
     } else if (dimensions === 2) {
-      let out = []
       for (let n = min; n < max; n += step) {
         let x, y
         if (type === 'parametric') {
@@ -315,28 +380,7 @@ onmessage = ({
           x = n
           y = plotters[0](n)
         }
-        if (x < xmin || x > xmax || y < ymin || y > ymax) {
-          // Out of range
-          if (!out.length) {
-            // Adding first out of range point
-            points.push(x, y)
-          }
-          out = [x, y]
-          continue
-        } else if (out.length) {
-          // In range but was out, adding last out of range point
-          if (points.length > 1) {
-            // Assuming assymptote:
-            if (type === 'linear-horizontal') {
-              points.push(NaN, points[1])
-            } else if (type === 'linear') {
-              points.push(points[0], NaN)
-            }
-          }
-          points.push(...out)
-          out = []
-        }
-        points.push(x, y)
+        pushBounded(points, x, y, region, type)
       }
       if (adaptative) {
         points = new Float32Array(
