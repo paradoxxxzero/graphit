@@ -43,7 +43,8 @@ export const plotFunctions = async (
     let { type, funs, min, max, samples, mode, recIndexes } = getFunctionParams(
       functionsText[i],
       region,
-      precisions
+      precisions,
+      options
     )
     if (recIndexes) {
       recs = {}

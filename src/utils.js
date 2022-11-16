@@ -30,7 +30,7 @@ export function orderRange(min, max, proj, minTick) {
   }
 }
 
-export function getFunctionParams(fun, region, precisions) {
+export function getFunctionParams(fun, region, precisions, options) {
   let match,
     type,
     funs,
@@ -65,7 +65,7 @@ export function getFunctionParams(fun, region, precisions) {
     if (min === null) {
       ;[[min, max]] = region
     }
-    if (samples === 'size') {
+    if (samples === 'size' || options.dimensions === 1) {
       samples = precisions[0]
     } else if (samples === null) {
       samples = 'auto'
@@ -76,7 +76,7 @@ export function getFunctionParams(fun, region, precisions) {
     if (min === null) {
       ;[, [min, max]] = region
     }
-    if (samples === 'size') {
+    if (samples === 'size' || options.dimensions === 1) {
       samples = precisions[1]
     } else if (samples === null) {
       samples = 'auto'
