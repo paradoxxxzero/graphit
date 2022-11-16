@@ -104,9 +104,9 @@ self.__doc__ = {
 
 const auto = {
   sampling: 1000,
-  pass: 32,
-  precision: PI / 32,
-  straightness: PI / 1000,
+  precisionPass: 16,
+  precision: PI / 1024,
+  straightness: PI / 5000,
   supplenessPrecision: ETA / 2,
   suppleness: PI / 2000,
   maxPoints: 10000,
@@ -148,7 +148,7 @@ const pushBounded = (points, x, y, region, type) => {
   points.push(x, y)
 }
 
-const adaptative = (points, plotters, type, region) => {
+const increasePrecision = (points, plotters, type, region) => {
   const [[xmin, xmax], [ymin, ymax]] = region
   const newPoints = []
   const push = (x, y) => pushBounded(newPoints, x, y, region, type)
@@ -164,11 +164,8 @@ const adaptative = (points, plotters, type, region) => {
     }
   }
   const k = (ymax - ymin) / (xmax - xmin)
-  // TODO: Handle last points
-  // TODO: Handle domains
-  // TODO: Handle last outs
   let i
-  for (i = 0; i < points.length - 4; i += 4) {
+  for (i = 0; i < points.length - 6; i += 4) {
     const x1 = points[i]
     const y1 = points[i + 1]
     const x2 = points[i + 2]
@@ -198,14 +195,8 @@ const adaptative = (points, plotters, type, region) => {
     const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
     const absAngle = Math.abs(angle)
-    const isStraight = absAngle < auto.straightness
     const subdivide = absAngle > auto.precision
 
-    if (isStraight) {
-      push(x1, y1)
-      // Skip middle point
-      continue
-    }
     if (
       absAngle > auto.supplenessPrecision &&
       (angle12 > self.eta - auto.suppleness ||
@@ -237,37 +228,61 @@ const adaptative = (points, plotters, type, region) => {
   }
   return newPoints
 }
-const same = (points1, points2) => {
-  if (!points2 || points1.length !== points2.length) {
-    return false
-  }
-  const length = points1.length
-  for (let i = 0; i < length; i++) {
-    if (points1[i] !== points2[i]) {
-      return false
+
+const removeUselessPoints = (points, type, region) => {
+  const [[xmin, xmax], [ymin, ymax]] = region
+  const newPoints = []
+  const k = (ymax - ymin) / (xmax - xmin)
+  let i,
+    shift = 0
+  for (i = 0; i + shift < points.length; i += 2) {
+    const x1 = points[i]
+    const y1 = points[i + 1]
+    const x2 = points[i + 2 + shift]
+    const y2 = points[i + 3 + shift]
+    const x3 = points[i + 4 + shift]
+    const y3 = points[i + 5 + shift]
+
+    if (
+      (type === 'linear' && (isNaN(y1) || isNaN(y2) || isNaN(y3))) ||
+      (type === 'linear-horizontal' && (isNaN(x1) || isNaN(x2) || isNaN(x3)))
+    ) {
+      i += shift
+      shift = 0
+      newPoints.push(x1, y1)
+      continue
+    }
+
+    const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
+    const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
+    const angle = angle23 - angle12
+    const distance = Math.sqrt(
+      ((x3 - x1) / (xmax - xmin)) ** 2 + ((y3 - y1) / (ymax - ymin)) ** 2
+    )
+    const skip = Math.abs(angle) * distance < auto.straightness
+
+    if (skip) {
+      i -= 2
+      shift += 2
+    } else {
+      newPoints.push(x1, y1)
+      i += shift
+      shift = 0
     }
   }
-  return true
+  return newPoints
 }
 
 const adaptativePlot = (points, plotters, type, region) => {
-  const pointsLengths = [points.length]
-  let lastPoints = points
-  let lastLastPoints = null
-  for (let i = 0; i < auto.pass; i++) {
+  points = removeUselessPoints(points, type, region)
+  for (let i = 0; i < auto.precisionPass; i++) {
     if (points.length > auto.maxPoints) {
       // console.warn("Max points reached, can't subdivide anymore")
       break
     }
-    points = adaptative(points, plotters, type, region)
-    if (same(points, lastPoints) || same(points, lastLastPoints)) {
-      break
-    }
-    lastLastPoints = lastPoints
-    lastPoints = points
-    pointsLengths.push(points.length)
+    points = increasePrecision(points, plotters, type, region)
   }
-  console.log(pointsLengths)
+  points = removeUselessPoints(points, type, region)
   return points
 }
 
