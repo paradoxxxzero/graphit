@@ -141,7 +141,7 @@ export const Graphit = memo(
       const data = await plotFunctions(
         functions,
         region,
-        [1 / canvas.width, 1 / canvas.height],
+        [canvas.width, canvas.height],
         recordings
       )
       const errors = []
@@ -150,37 +150,49 @@ export const Graphit = memo(
 
       for (let i = 0; i < data.length; i++) {
         if (!data[i]) continue
-        const { index, values, err } = data[i]
+        const { index, values, mode, err } = data[i]
         if (err) {
           errors.push(err)
           continue
         }
         ctx.fillStyle = ctx.strokeStyle = theme.colors[index]
 
-        for (let d = 0; d < values.length; d++) {
-          ctx.beginPath()
-          const domain = values[d]
-          for (let n = 0; n < domain.length; n += 2) {
-            const i = x2i(domain[n])
-            const j = y2j(domain[n + 1])
-            if (lineWidth) {
-              if (n === 0) {
-                ctx.moveTo(i, j)
-              } else {
-                ctx.lineTo(i, j)
-              }
+        ctx.beginPath()
+        let last = false
+        for (let n = 0; n < values.length; n += 2) {
+          if (isNaN(values[n]) || isNaN(values[n + 1])) {
+            last = false
+            continue
+          }
+          const i = x2i(values[n])
+          const j = y2j(values[n + 1])
+          if (mode === 'line') {
+            if (last) {
+              ctx.lineTo(i, j)
             } else {
               ctx.moveTo(i, j)
-              ctx.arc(i, j, 1, 0, TAU)
             }
           }
-          if (lineWidth) {
-            ctx.stroke()
+          if (mode === 'dot') {
+            ctx.fillRect(
+              i - lineWidth / 2,
+              j - lineWidth / 2,
+              lineWidth,
+              lineWidth
+            )
           }
+          if (mode === 'point') {
+            ctx.moveTo(i, j)
+            ctx.arc(i, j, lineWidth, 0, TAU)
+          }
+          last = true
         }
-      }
-      if (!lineWidth) {
-        ctx.fill()
+        if (mode === 'line') {
+          ctx.stroke()
+        }
+        if (['dot', 'point'].includes(mode)) {
+          ctx.fill()
+        }
       }
       console.error(...errors)
       return true

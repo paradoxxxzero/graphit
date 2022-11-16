@@ -33,15 +33,20 @@ export function getFunctionParams(fun, region, precisions) {
     recIndexes,
     min = null,
     max = null,
-    step = null
-  if ((match = fun.match(/(.+)!\s*(.+)\s*$/))) {
+    samples = null,
+    mode = 'line'
+  if ((match = fun.match(/(.+)@\/(.+)$/))) {
     fun = match[1]
-    step = match[2]
+    mode = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@\s*(.+)\s*->\s*(.+)\s*/))) {
+  if ((match = fun.match(/(.+)@!(.+)$/))) {
     fun = match[1]
-    min = match[2]
-    max = match[3]
+    samples = match[2].trim()
+  }
+  if ((match = fun.match(/(.+)@(.+)->(.+)/))) {
+    fun = match[1]
+    min = match[2].trim()
+    max = match[3].trim()
   }
 
   if ((match = fun.match(/\$rec\d\(.+?\)/g))) {
@@ -50,53 +55,59 @@ export function getFunctionParams(fun, region, precisions) {
       recIndexes.push(rec.match(/\$rec(\d)/)[1])
     })
   }
-  if ((match = fun.match(/^\s*y\s*=\s*(.+)\s*$/))) {
+  if ((match = fun.match(/^\s*y\s*=(.+)$/))) {
     type = 'linear'
-    funs = [match[1]]
+    funs = [match[1].trim()]
     if (min === null) {
       ;[[min, max]] = region
     }
-    if (step === null) {
-      step = precisions[0]
+    if (samples === null) {
+      samples = precisions[0]
     }
-  } else if ((match = fun.match(/^\s*x\s*=\s*(.+)\s*$/))) {
+  } else if ((match = fun.match(/^\s*x\s*=(.+)$/))) {
     type = 'linear-horizontal'
-    funs = [match[1]]
+    funs = [match[1].trim()]
     if (min === null) {
       ;[, [min, max]] = region
     }
-    if (step === null) {
-      step = precisions[1]
+    if (samples === null) {
+      samples = precisions[1]
     }
-  } else if ((match = fun.match(/^\s*r\s*=\s*(.+)\s*$/))) {
+  } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'
-    funs = [match[1]]
+    funs = [match[1].trim()]
     if (min === null) {
       ;[min, max] = [0, 2 * Math.PI]
     }
-    if (step === null) {
-      step = Math.min(...precisions)
+    if (samples === null) {
+      samples = Math.min(...precisions)
     }
-  } else if (
-    (match = fun.match(/^\s*{\s*x\s*=\s*(.+)\s*,\s*y\s*=\s*(.+)\s*}\s*$/))
-  ) {
+  } else if ((match = fun.match(/^\s*{\s*x\s*=(.+),\s*y\s*=(.+)}\s*$/))) {
     type = 'parametric'
-    funs = [match[1], match[2]]
+    funs = [match[1].trim(), match[2].trim()]
     if (min === null) {
       ;[min, max] = [0, 1]
     }
-    if (step === null) {
-      step = Math.min(...precisions)
+    if (samples === null) {
+      samples = Math.min(...precisions)
     }
-  } else if ((match = fun.match(/^\s*(\S+)\s*=\s*(.+)\s*$/))) {
+  } else if ((match = fun.match(/^\s*(\S+)\s*=(.+)$/))) {
     type = 'affect'
-    funs = [match[1], match[2]]
+    funs = [match[1].trim(), match[2].trim()]
     ;[min, max] = [0, 1]
-    step = 1
+    samples = 1
   } else {
     type = 'unknown'
     funs = [fun]
   }
 
-  return { type, funs: funs.map(f => f.trim()), min, max, step, recIndexes }
+  return {
+    type,
+    funs,
+    min,
+    max,
+    samples,
+    mode,
+    recIndexes,
+  }
 }

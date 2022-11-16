@@ -42,7 +42,7 @@ export const Audio = ({
           [0, duration],
           [0, duration],
         ],
-        [1 / (duration * sampleRate), 1 / (duration * sampleRate)],
+        [duration * sampleRate, duration * sampleRate],
         recordings,
         { dimensions: 1 }
       )

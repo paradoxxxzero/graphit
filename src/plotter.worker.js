@@ -13,7 +13,10 @@ for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
 }
 
 // Custom globlals:
-self.TAU = self.PI * 2
+const PI = self.PI
+const TAU = (self.tau = self.TAU = self.PI * 2)
+const ETA = (self.eta = self.ETA = self.PI / 2)
+
 self.osc = (freq, x, type = 'sine') =>
   x < 0
     ? 0
@@ -99,15 +102,19 @@ self.__doc__ = {
     'Returns the integer portion of x, removing any fractional digits.',
 }
 
-const subdivideIfNeededPoints = (
-  f,
-  points,
-  region,
-  precision,
-  straightness,
-  suppleness
-) => {
+const auto = {
+  sampling: 1000,
+  pass: 32,
+  precision: PI / 2 ** 11,
+  straightness: PI / 2 ** 8,
+  supplenessPrecision: ETA,
+  suppleness: PI / 2 ** 12,
+  maxPoints: 2 ** 14,
+}
+
+const adaptative = (points, plotters, type, region) => {
   const [[xmin, xmax], [ymin, ymax]] = region
+  const k = (ymax - ymin) / (xmax - xmin)
   let newPoints = []
   // TODO: Handle last points
   // TODO: Handle domains
@@ -120,52 +127,57 @@ const subdivideIfNeededPoints = (
     const y2 = points[i + 3]
     const x3 = points[i + 4]
     const y3 = points[i + 5]
-    const angle12 = Math.atan2(y2 - y1, x2 - x1)
-    const angle23 = Math.atan2(y3 - y2, x3 - x2)
+    const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
+    const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
-    const isStraight = Math.abs(angle) < straightness
-    const subdivide = Math.abs(angle) > precision
+    const absAngle = Math.abs(angle)
+    const isStraight = absAngle < auto.straightness
+    const subdivide = absAngle > auto.precision
+
     if (isStraight) {
       newPoints.push(x1, y1)
+      // Skip middle point
       continue
     }
     if (
-      subdivide &&
-      (angle12 > Math.PI / 2 - suppleness ||
-        angle12 < -Math.PI / 2 + suppleness)
+      absAngle > auto.supplenessPrecision &&
+      (angle12 > self.eta - auto.suppleness ||
+        angle12 < -self.eta + auto.suppleness)
     ) {
+      // Skip first point since they are vertically close
       newPoints.push(x2, y2)
-      const x231 = (x2 * 1.5 + x3 * 0.5) / 2
-      const y231 = f(x231)
-      // if (x231 > xmin && x231 < xmax && y231 > ymin && y231 < ymax) {
+      // Add a point after the angle
+      const x231 = (x2 * 3 + x3) / 4
+      const y231 = plotters[0](x231)
+      // // if (x231 > xmin && x231 < xmax && y231 > ymin && y231 < ymax) {
       newPoints.push(x231, y231)
       // }
-      const x232 = (x2 * 0.5 + x3 * 1.5) / 2
-      const y232 = f(x232)
-      // if (x232 > xmin && x232 < xmax && y232 > ymin && y232 < ymax) {
+      const x232 = (x2 + x3 * 3) / 4
+      const y232 = plotters[0](x232)
+      // // if (x232 > xmin && x232 < xmax && y232 > ymin && y232 < ymax) {
       newPoints.push(x232, y232)
       // }
       continue
     }
 
     // const skip =
-    //   Math.PI / 2 - angle12 < straightness &&
-    //   Math.PI / 2 - angle23 < straightness
+    //   self.eta - angle12 < auto.straightness &&
+    //   self.eta - angle23 < auto.straightness
     // This only works on linear (vertical)
     newPoints.push(x1, y1)
     if (subdivide) {
       const x12 = (x1 + x2) / 2
-      const y12 = f(x12)
+      const y12 = plotters[0](x12)
       // if (x12 > xmin && x12 < xmax && y12 > ymin && y12 < ymax) {
       newPoints.push(x12, y12)
       // }
     }
-    // if (Math.PI / 2 - angle23 > straightness) {
+    // if (self.eta - angle23 > auto.straightness) {
     newPoints.push(x2, y2)
     // }
     if (subdivide) {
       const x23 = (x2 + x3) / 2
-      const y23 = f(x23)
+      const y23 = plotters[0](x23)
       // if (x23 > xmin && x23 < xmax && y23 > ymin && y23 < ymax) {
       newPoints.push(x23, y23)
       // }
@@ -178,53 +190,22 @@ const subdivideIfNeededPoints = (
   return newPoints
 }
 
-const adaptativePlot = (
-  fns,
-  type,
-  min,
-  max,
-  region,
-  samples = 100,
-  pass = 50,
-  precision = Math.PI / 2 ** 11,
-  straightness = Math.PI / 2 ** 9,
-  suppleness = Math.PI / 2 ** 20,
-  maxPoints = 2 ** 14
-) => {
-  const [[xmin, xmax], [ymin, ymax]] = region
-  if (type === 'linear') {
-    let points = []
-    const f = fns[0]
-    for (let x = min; x <= max; x += (max - min) / samples) {
-      const y = f(x)
-      if (x > xmin && x < xmax && y > ymin && y < ymax) {
-        points.push(x, y)
-      }
+const adaptativePlot = (points, plotters, type, region) => {
+  const iterations = []
+  for (let i = 0; i < auto.pass; i++) {
+    if (points.length > auto.maxPoints) {
+      console.warn("Max points reached, can't subdivide anymore")
+      break
     }
-    const nPoints = points.length
-    for (let i = 0; i < pass; i += 2) {
-      if (points.length > maxPoints) {
-        console.warn("Max points reached, can't subdivide anymore")
-        break
-      }
-      points = subdivideIfNeededPoints(
-        f,
-        points,
-        region,
-        precision,
-        straightness,
-        suppleness
-      )
-    }
-    console.log(nPoints, '->', points.length)
-    return points
-  } else {
-    throw new Error('Not implemented')
+    iterations.push(points.length / 2)
+    points = adaptative(points, plotters, type, region)
   }
+  console.log(iterations.join('->'))
+  return points
 }
 
+const modes = ['line', 'dot', 'point']
 const affected = {}
-
 onmessage = ({
   data: {
     index,
@@ -232,20 +213,28 @@ onmessage = ({
     type,
     min,
     max,
-    step,
+    samples,
     region,
     affects,
+    mode,
     recs,
     dimensions = 2,
     uuid,
   },
 }) => {
   let err = '',
-    values = []
+    points = [],
+    values,
+    adaptative = false
 
   try {
     if (type === 'unknown') {
-      throw new Error(`Unknow function type ${funs.join(', ')}`)
+      throw new Error(`Invalid function type ${funs.join(', ')}`)
+    }
+    if (!modes.includes(mode)) {
+      throw new Error(
+        `Invalid mode: ${mode}, must be one of ${modes.join(', ')}`
+      )
     }
     if (typeof min === 'string') {
       min = new Function('return ' + min)()
@@ -253,14 +242,17 @@ onmessage = ({
     if (typeof max === 'string') {
       max = new Function('return ' + max)()
     }
-    if (typeof step === 'string' && step !== 'auto') {
-      step = new Function('return ' + step)()
-    }
-    if (step !== 'auto') {
-      step = (max - min) * step
-      if (isNaN(step) || step < 1e-9) {
-        throw new Error(`Invalid step ${step}`)
+    if (typeof samples === 'string') {
+      if (samples === 'auto') {
+        adaptative = true
+        samples = auto.sampling
+      } else {
+        samples = new Function('return ' + samples)()
       }
+    }
+    const step = (max - min) / samples
+    if (isNaN(step) || step < 1e-9) {
+      throw new Error(`Invalid step ${step}`)
     }
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
@@ -283,78 +275,77 @@ onmessage = ({
       })
     }
     const [[xmin, xmax], [ymin, ymax]] = region
-    let lastOutX = null,
-      lastOutY = null,
-      lastOut = true
-    const domains = []
-    let domain = []
+
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    if (step === 'auto') {
-      domain = adaptativePlot(plotters, type, min, max, region)
-    } else {
+    if (dimensions === 1) {
+      values = new Float32Array((max - min) / step)
+      let i = 0
       for (let n = min; n < max; n += step) {
-        if (dimensions === 1) {
-          const val = plotters[0](n)
-          if (typeof val !== 'number') {
-            let e
-            if (typeof val === 'function') {
-              e = new Error(self.__doc__[val] || 'Function not supported')
-            } else if (typeof val === 'undefined') {
-              e = new Error(`${funs[0]} is undefined`)
-            } else {
-              e = new Error(`${typeof val} is not a number`)
-            }
-            throw e
-          }
-          domain.push(val)
-        } else {
-          let x, y
-          if (type === 'parametric') {
-            x = plotters[0](n)
-            y = plotters[1](n)
-          } else if (type === 'polar') {
-            const r = plotters[0](n)
-            x = r * Math.cos(n)
-            y = r * Math.sin(n)
-          } else if (type === 'linear-horizontal') {
-            x = plotters[0](n)
-            y = n
+        const val = plotters[0](n)
+        if (typeof val !== 'number') {
+          let e
+          if (typeof val === 'function') {
+            e = new Error(self.__doc__[val] || 'Function not supported')
+          } else if (typeof val === 'undefined') {
+            e = new Error(`${funs[0]} is undefined`)
           } else {
-            x = n
-            y = plotters[0](n)
+            e = new Error(`${typeof val} is not a number`)
           }
-          if (x < xmin || x > xmax || y < ymin || y > ymax) {
-            // Out of range
-            lastOutX = x
-            lastOutY = y
-            if (lastOut) {
-              continue
-            }
-            // Coming out of range
-            lastOut = true
-            // Ending last domain
-          } else if (lastOut) {
-            // Coming back in range
-            lastOut = false
-            // Beginning new domain
-            if (domain.length) {
-              domains.push(domain)
-              domain = []
-            }
-            if (lastOutX !== null) {
-              domain.push(lastOutX, lastOutY)
-            }
-          }
-          domain.push(x, y)
+          throw e
         }
+        values[i++] = val
       }
+    } else if (dimensions === 2) {
+      let out = []
+      for (let n = min; n < max; n += step) {
+        let x, y
+        if (type === 'parametric') {
+          x = plotters[0](n)
+          y = plotters[1](n)
+        } else if (type === 'polar') {
+          const r = plotters[0](n)
+          x = r * Math.cos(n)
+          y = r * Math.sin(n)
+        } else if (type === 'linear-horizontal') {
+          x = plotters[0](n)
+          y = n
+        } else {
+          x = n
+          y = plotters[0](n)
+        }
+        if (x < xmin || x > xmax || y < ymin || y > ymax) {
+          // Out of range
+          if (!out.length) {
+            // Adding first out of range point
+            points.push(x, y)
+          }
+          out = [x, y]
+          continue
+        } else if (out.length) {
+          // In range but was out, adding last out of range point
+          if (points.length > 1) {
+            // Assuming assymptote:
+            if (type === 'linear-horizontal') {
+              points.push(NaN, points[1])
+            } else if (type === 'linear') {
+              points.push(points[0], NaN)
+            }
+          }
+          points.push(...out)
+          out = []
+        }
+        points.push(x, y)
+      }
+      if (adaptative) {
+        points = new Float32Array(
+          adaptativePlot(points, plotters, type, region)
+        )
+      }
+      values = new Float32Array(points)
     }
-    if (domain.length) {
-      domains.push(domain)
-    }
-    values = domains.map(domain => new Float32Array(domain))
+
     if (recs) {
       Object.keys(recs).forEach(i => {
         delete self[`$rec${i}`]
@@ -369,8 +360,5 @@ onmessage = ({
     err = e
   }
 
-  postMessage(
-    { index, values, type, err, uuid },
-    values.map(v => v.buffer)
-  )
+  postMessage({ index, values, type, mode, err, uuid }, values?.buffer)
 }
