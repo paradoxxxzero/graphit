@@ -6,6 +6,7 @@ import { clamp, lerp, orderRange } from './utils'
 
 const TICK_SIZE = 10
 const MIN_TICK = 200
+const TAU = 2 * Math.PI
 
 export const Graphit = memo(
   function ({
@@ -154,7 +155,7 @@ export const Graphit = memo(
           errors.push(err)
           continue
         }
-        ctx.strokeStyle = theme.colors[index]
+        ctx.fillStyle = ctx.strokeStyle = theme.colors[index]
 
         for (let d = 0; d < values.length; d++) {
           ctx.beginPath()
@@ -162,14 +163,24 @@ export const Graphit = memo(
           for (let n = 0; n < domain.length; n += 2) {
             const i = x2i(domain[n])
             const j = y2j(domain[n + 1])
-            if (n === 0) {
-              ctx.moveTo(i, j)
+            if (lineWidth) {
+              if (n === 0) {
+                ctx.moveTo(i, j)
+              } else {
+                ctx.lineTo(i, j)
+              }
             } else {
-              ctx.lineTo(i, j)
+              ctx.moveTo(i, j)
+              ctx.arc(i, j, 1, 0, TAU)
             }
           }
-          ctx.stroke()
+          if (lineWidth) {
+            ctx.stroke()
+          }
         }
+      }
+      if (!lineWidth) {
+        ctx.fill()
       }
       console.error(...errors)
       return true

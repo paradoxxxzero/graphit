@@ -491,9 +491,9 @@ export function App() {
           <input
             type="text"
             value={functionsText}
-            autocapitalize="off"
-            autocomplete="off"
-            spellcheck="false"
+            autoCapitalize="off"
+            autoComplete="off"
+            spellCheck="false"
             translate="no"
             autoFocus
             style={{
@@ -563,6 +563,7 @@ export function App() {
                 <input
                   type="number"
                   name="lineWidth"
+                  min={0}
                   step={0.1}
                   value={state.lineWidth}
                   onChange={e =>
@@ -576,6 +577,7 @@ export function App() {
                 <input
                   type="number"
                   name="duration"
+                  min={0}
                   step={0.1}
                   value={state.duration}
                   onChange={e =>
@@ -588,6 +590,7 @@ export function App() {
                 <input
                   type="number"
                   name="sampleRate"
+                  min={1000}
                   value={state.sampleRate}
                   onChange={e =>
                     dispatch({ type: 'sampleRate', sampleRate: e.target.value })

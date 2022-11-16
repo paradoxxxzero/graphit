@@ -99,6 +99,130 @@ self.__doc__ = {
     'Returns the integer portion of x, removing any fractional digits.',
 }
 
+const subdivideIfNeededPoints = (
+  f,
+  points,
+  region,
+  precision,
+  straightness,
+  suppleness
+) => {
+  const [[xmin, xmax], [ymin, ymax]] = region
+  let newPoints = []
+  // TODO: Handle last points
+  // TODO: Handle domains
+  // TODO: Handle last outs
+  let i
+  for (i = 0; i < points.length - 4; i += 4) {
+    const x1 = points[i]
+    const y1 = points[i + 1]
+    const x2 = points[i + 2]
+    const y2 = points[i + 3]
+    const x3 = points[i + 4]
+    const y3 = points[i + 5]
+    const angle12 = Math.atan2(y2 - y1, x2 - x1)
+    const angle23 = Math.atan2(y3 - y2, x3 - x2)
+    const angle = angle23 - angle12
+    const isStraight = Math.abs(angle) < straightness
+    const subdivide = Math.abs(angle) > precision
+    if (isStraight) {
+      newPoints.push(x1, y1)
+      continue
+    }
+    if (
+      subdivide &&
+      (angle12 > Math.PI / 2 - suppleness ||
+        angle12 < -Math.PI / 2 + suppleness)
+    ) {
+      newPoints.push(x2, y2)
+      const x231 = (x2 * 1.5 + x3 * 0.5) / 2
+      const y231 = f(x231)
+      // if (x231 > xmin && x231 < xmax && y231 > ymin && y231 < ymax) {
+      newPoints.push(x231, y231)
+      // }
+      const x232 = (x2 * 0.5 + x3 * 1.5) / 2
+      const y232 = f(x232)
+      // if (x232 > xmin && x232 < xmax && y232 > ymin && y232 < ymax) {
+      newPoints.push(x232, y232)
+      // }
+      continue
+    }
+
+    // const skip =
+    //   Math.PI / 2 - angle12 < straightness &&
+    //   Math.PI / 2 - angle23 < straightness
+    // This only works on linear (vertical)
+    newPoints.push(x1, y1)
+    if (subdivide) {
+      const x12 = (x1 + x2) / 2
+      const y12 = f(x12)
+      // if (x12 > xmin && x12 < xmax && y12 > ymin && y12 < ymax) {
+      newPoints.push(x12, y12)
+      // }
+    }
+    // if (Math.PI / 2 - angle23 > straightness) {
+    newPoints.push(x2, y2)
+    // }
+    if (subdivide) {
+      const x23 = (x2 + x3) / 2
+      const y23 = f(x23)
+      // if (x23 > xmin && x23 < xmax && y23 > ymin && y23 < ymax) {
+      newPoints.push(x23, y23)
+      // }
+    }
+  }
+
+  for (let j = i; j < points.length; j++) {
+    newPoints.push(points[j])
+  }
+  return newPoints
+}
+
+const adaptativePlot = (
+  fns,
+  type,
+  min,
+  max,
+  region,
+  samples = 100,
+  pass = 50,
+  precision = Math.PI / 2 ** 11,
+  straightness = Math.PI / 2 ** 9,
+  suppleness = Math.PI / 2 ** 20,
+  maxPoints = 2 ** 14
+) => {
+  const [[xmin, xmax], [ymin, ymax]] = region
+  if (type === 'linear') {
+    let points = []
+    const f = fns[0]
+    for (let x = min; x <= max; x += (max - min) / samples) {
+      const y = f(x)
+      if (x > xmin && x < xmax && y > ymin && y < ymax) {
+        points.push(x, y)
+      }
+    }
+    const nPoints = points.length
+    for (let i = 0; i < pass; i += 2) {
+      if (points.length > maxPoints) {
+        console.warn("Max points reached, can't subdivide anymore")
+        break
+      }
+      points = subdivideIfNeededPoints(
+        f,
+        points,
+        region,
+        precision,
+        straightness,
+        suppleness
+      )
+    }
+    console.log(nPoints, '->', points.length)
+    return points
+  } else {
+    throw new Error('Not implemented')
+  }
+}
+
 const affected = {}
 
 onmessage = ({
@@ -118,6 +242,7 @@ onmessage = ({
 }) => {
   let err = '',
     values = []
+
   try {
     if (type === 'unknown') {
       throw new Error(`Unknow function type ${funs.join(', ')}`)
@@ -128,12 +253,14 @@ onmessage = ({
     if (typeof max === 'string') {
       max = new Function('return ' + max)()
     }
-    if (typeof step === 'string') {
+    if (typeof step === 'string' && step !== 'auto') {
       step = new Function('return ' + step)()
     }
-    step = (max - min) * step
-    if (step < 1e-9) {
-      throw new Error(`Invalid step ${step}`)
+    if (step !== 'auto') {
+      step = (max - min) * step
+      if (isNaN(step) || step < 1e-9) {
+        throw new Error(`Invalid step ${step}`)
+      }
     }
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
@@ -164,60 +291,64 @@ onmessage = ({
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    for (let n = min; n < max; n += step) {
-      if (dimensions === 1) {
-        const val = plotters[0](n)
-        if (typeof val !== 'number') {
-          let e
-          if (typeof val === 'function') {
-            e = new Error(self.__doc__[val] || 'Function not supported')
-          } else if (typeof val === 'undefined') {
-            e = new Error(`${funs[0]} is undefined`)
-          } else {
-            e = new Error(`${typeof val} is not a number`)
+    if (step === 'auto') {
+      domain = adaptativePlot(plotters, type, min, max, region)
+    } else {
+      for (let n = min; n < max; n += step) {
+        if (dimensions === 1) {
+          const val = plotters[0](n)
+          if (typeof val !== 'number') {
+            let e
+            if (typeof val === 'function') {
+              e = new Error(self.__doc__[val] || 'Function not supported')
+            } else if (typeof val === 'undefined') {
+              e = new Error(`${funs[0]} is undefined`)
+            } else {
+              e = new Error(`${typeof val} is not a number`)
+            }
+            throw e
           }
-          throw e
-        }
-        domain.push(val)
-      } else {
-        let x, y
-        if (type === 'parametric') {
-          x = plotters[0](n)
-          y = plotters[1](n)
-        } else if (type === 'polar') {
-          const r = plotters[0](n)
-          x = r * Math.cos(n)
-          y = r * Math.sin(n)
-        } else if (type === 'linear-horizontal') {
-          x = plotters[0](n)
-          y = n
+          domain.push(val)
         } else {
-          x = n
-          y = plotters[0](n)
+          let x, y
+          if (type === 'parametric') {
+            x = plotters[0](n)
+            y = plotters[1](n)
+          } else if (type === 'polar') {
+            const r = plotters[0](n)
+            x = r * Math.cos(n)
+            y = r * Math.sin(n)
+          } else if (type === 'linear-horizontal') {
+            x = plotters[0](n)
+            y = n
+          } else {
+            x = n
+            y = plotters[0](n)
+          }
+          if (x < xmin || x > xmax || y < ymin || y > ymax) {
+            // Out of range
+            lastOutX = x
+            lastOutY = y
+            if (lastOut) {
+              continue
+            }
+            // Coming out of range
+            lastOut = true
+            // Ending last domain
+          } else if (lastOut) {
+            // Coming back in range
+            lastOut = false
+            // Beginning new domain
+            if (domain.length) {
+              domains.push(domain)
+              domain = []
+            }
+            if (lastOutX !== null) {
+              domain.push(lastOutX, lastOutY)
+            }
+          }
+          domain.push(x, y)
         }
-        if (x < xmin || x > xmax || y < ymin || y > ymax) {
-          // Out of range
-          lastOutX = x
-          lastOutY = y
-          if (lastOut) {
-            continue
-          }
-          // Coming out of range
-          lastOut = true
-          // Ending last domain
-        } else if (lastOut) {
-          // Coming back in range
-          lastOut = false
-          // Beginning new domain
-          if (domain.length) {
-            domains.push(domain)
-            domain = []
-          }
-          if (lastOutX !== null) {
-            domain.push(lastOutX, lastOutY)
-          }
-        }
-        domain.push(x, y)
       }
     }
     if (domain.length) {
