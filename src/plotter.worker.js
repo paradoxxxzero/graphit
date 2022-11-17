@@ -103,12 +103,11 @@ self.__doc__ = {
 }
 
 const auto = {
-  sampling: 1000,
+  sampling: 1500,
   precisionPass: 16,
   precision: PI / 1024,
-  straightness: PI / 5000,
-  supplenessPrecision: ETA / 2,
-  suppleness: PI / 2000,
+  extremumPass: 64,
+  straightness: 1e-6,
   maxPoints: 10000,
 }
 
@@ -122,25 +121,27 @@ const pushBounded = (points, x, y, region, type) => {
     y > region[1][1]
   ) {
     // Out of range
-    if (
-      !points.out?.length ||
-      ((isNaN(x) || isNaN(y)) && !isNaN(points.out[0]) && !isNaN(points.out[1]))
-    ) {
+    if (!points.out?.length) {
       // Adding first points.out of range point
-      points.push(x, y)
+      if (points.length > 0) {
+        points.push(x, y)
+      }
     }
     points.out = [x, y]
     return
   }
   if (points.out?.length) {
     // In range but was points.out, adding last points.out of range point
-    if (points.length > 1) {
-      // Assuming assymptote:
-      if (type === 'linear-horizontal') {
-        points.push(NaN, points[points.length - 1])
-      } else if (type === 'linear') {
-        points.push(points[points.length - 2], NaN)
-      }
+    if (type === 'linear-horizontal') {
+      points.push(
+        NaN,
+        ((points[points.length - 1] || region[1][0]) + points.out[1]) / 2
+      )
+    } else if (type === 'linear') {
+      points.push(
+        ((points[points.length - 2] || region[0][0]) + points.out[0]) / 2,
+        NaN
+      )
     }
     points.push(...points.out)
     points.out.splice(0)
@@ -148,67 +149,48 @@ const pushBounded = (points, x, y, region, type) => {
   points.push(x, y)
 }
 
+const dividePoints = (push, plotters, type, x1, y1, x2, y2, k) => {
+  if (type === 'linear') {
+    const x = k * x1 + (1 - k) * x2
+    const y = plotters[0](x)
+    push(x, y)
+  } else if (type === 'linear-horizontal') {
+    const y = k * y1 + (1 - k) * y2
+    const x = plotters[0](y)
+    push(x, y)
+  }
+}
 const increasePrecision = (points, plotters, type, region) => {
   const [[xmin, xmax], [ymin, ymax]] = region
   const newPoints = []
   const push = (x, y) => pushBounded(newPoints, x, y, region, type)
-  const divide = (x1, y1, x2, y2, k) => {
-    if (type === 'linear') {
-      const x = k * x1 + (1 - k) * x2
-      const y = plotters[0](x)
-      push(x, y)
-    } else if (type === 'linear-horizontal') {
-      const y = k * y1 + (1 - k) * y2
-      const x = plotters[0](y)
-      push(x, y)
-    }
-  }
+  const divide = (x1, y1, x2, y2, k) =>
+    dividePoints(push, plotters, type, x1, y1, x2, y2, k)
+
   const k = (ymax - ymin) / (xmax - xmin)
-  let i
-  for (i = 0; i < points.length - 6; i += 4) {
+  for (let i = 0; i < points.length; i += 4) {
+    // Reverse points in horizontal?
     const x1 = points[i]
     const y1 = points[i + 1]
     const x2 = points[i + 2]
     const y2 = points[i + 3]
     const x3 = points[i + 4]
     const y3 = points[i + 5]
-    if (isNaN(y1)) {
+
+    if (
+      (type === 'linear' && (isNaN(y1) || isNaN(y2) || isNaN(y3))) ||
+      (type === 'linear-horizontal' && (isNaN(x1) || isNaN(x2) || isNaN(x3)))
+    ) {
       push(x1, y1)
-      divide(x1, y1, x2, y2, 3 / 4)
       push(x2, y2)
       continue
     }
-    if (isNaN(y2)) {
-      push(x1, y1)
-      divide(x1, y1, x2, y2, 1 / 4)
-      push(x2, y2)
-      divide(x2, y2, x3, y3, 3 / 4)
-      continue
-    }
-    if (isNaN(y3)) {
-      push(x1, y1)
-      push(x2, y2)
-      divide(x2, y2, x3, y3, 1 / 4)
-      continue
-    }
+
     const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
     const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
     const absAngle = Math.abs(angle)
     const subdivide = absAngle > auto.precision
-
-    if (
-      absAngle > auto.supplenessPrecision &&
-      (angle12 > self.eta - auto.suppleness ||
-        angle12 < -self.eta + auto.suppleness)
-    ) {
-      // Skip first point since they are vertically close
-      push(x2, y2)
-      // Add a point after the angle
-      divide(x2, y2, x3, y3, 3 / 4)
-      divide(x2, y2, x3, y3, 1 / 4)
-      continue
-    }
 
     // This only works on linear (vertical)
     push(x1, y1)
@@ -223,19 +205,74 @@ const increasePrecision = (points, plotters, type, region) => {
       divide(x2, y2, x3, y3, 1 / 2)
     }
   }
-  for (let j = i; j < points.length; j += 2) {
-    push(points[j], points[j + 1])
-  }
   return newPoints
+}
+
+const affineExtremums = (points, plotters, type, region) => {
+  for (let i = 2; i < points.length - 2; i += 2) {
+    let x0 = points[i - 2]
+    let y0 = points[i - 1]
+    let x1 = points[i]
+    let y1 = points[i + 1]
+    let x2 = points[i + 2]
+    let y2 = points[i + 3]
+    const axisRegion = region[type === 'linear-horizontal' ? 0 : 1]
+    if (type === 'linear-horizontal') {
+      ;[x0, y0] = [y0, x0]
+      ;[x1, y1] = [y1, x1]
+      ;[x2, y2] = [y2, x2]
+    }
+    if (isNaN(y1) || isNaN(y2) || isNaN(y0)) {
+      continue
+    }
+
+    // TODO: horizontal
+    const sign01 = Math.sign(y1 - y0)
+    const sign12 = Math.sign(y2 - y1)
+    if (sign01 !== sign12) {
+      let xo0 = x0
+      let xo1 = x1
+      let xo2 = x2
+      let yo = y1
+
+      for (let j = 0; j < auto.extremumPass; j++) {
+        const xm0 = (xo0 + xo1) / 2
+        const ym0 = plotters[0](xm0)
+
+        const xm2 = (xo1 + xo2) / 2
+        const ym2 = plotters[0](xm2)
+
+        if (Math.sign(ym0 - yo) === sign01) {
+          xo2 = xo1
+          xo1 = xm0
+          yo = ym0
+        } else if (Math.sign(ym2 - yo) === sign01) {
+          xo0 = xo1
+          xo1 = xm2
+          yo = ym2
+        } else {
+          xo0 = xm0
+          xo2 = xm2
+        }
+        if (yo > axisRegion[1] || yo < axisRegion[0]) {
+          break
+        }
+      }
+      points[i] = xo1
+      points[i + 1] = yo
+      if (type === 'linear-horizontal') {
+        ;[points[i], points[i + 1]] = [points[i + 1], points[i]]
+      }
+    }
+  }
 }
 
 const removeUselessPoints = (points, type, region) => {
   const [[xmin, xmax], [ymin, ymax]] = region
   const newPoints = []
   const k = (ymax - ymin) / (xmax - xmin)
-  let i,
-    shift = 0
-  for (i = 0; i + shift < points.length; i += 2) {
+  let shift = 0
+  for (let i = 0; i + shift < points.length; i += 2) {
     const x1 = points[i]
     const y1 = points[i + 1]
     const x2 = points[i + 2 + shift]
@@ -256,9 +293,9 @@ const removeUselessPoints = (points, type, region) => {
     const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
     const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
-    const distance = Math.sqrt(
+    const distance =
       ((x3 - x1) / (xmax - xmin)) ** 2 + ((y3 - y1) / (ymax - ymin)) ** 2
-    )
+
     const skip = Math.abs(angle) * distance < auto.straightness
 
     if (skip) {
@@ -274,15 +311,21 @@ const removeUselessPoints = (points, type, region) => {
 }
 
 const adaptativePlot = (points, plotters, type, region) => {
+  // const lens = [points.length]
   points = removeUselessPoints(points, type, region)
+  // lens.push(points.length)
+  affineExtremums(points, plotters, type, region)
   for (let i = 0; i < auto.precisionPass; i++) {
     if (points.length > auto.maxPoints) {
       // console.warn("Max points reached, can't subdivide anymore")
       break
     }
     points = increasePrecision(points, plotters, type, region)
+    // lens.push(points.length)
   }
   points = removeUselessPoints(points, type, region)
+  // lens.push(points.length)
+  // console.log(lens)
   return points
 }
 
