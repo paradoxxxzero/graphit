@@ -211,9 +211,35 @@ export const Audio = ({
       gain.connect(dynamicsCompressor)
       dynamicsCompressor.connect(workletNode)
 
-      const chunks = []
+      let chunks = []
       workletNode.port.onmessage = ({ data }) => chunks.push(data)
       return async () => {
+        let start, end, k
+        for (start = 0; start < chunks.length; start++) {
+          const chunk = chunks[start]
+          for (k = 0; k < chunk.length; k++) {
+            if (Math.abs(chunk[k]) > 0.075) {
+              break
+            }
+          }
+          if (k < chunk.length) {
+            start--
+            break
+          }
+        }
+        for (end = chunks.length - 1; end >= 0; end--) {
+          const chunk = chunks[end]
+          for (k = 0; k < chunk.length; k++) {
+            if (Math.abs(chunk[k]) > 0.075) {
+              break
+            }
+          }
+          if (k < chunk.length) {
+            end++
+            break
+          }
+        }
+        chunks = chunks.slice(start, end)
         const size = chunks.reduce((a, b) => a + b.length, 0)
         const buffer = new Float32Array(size)
         let s = 0

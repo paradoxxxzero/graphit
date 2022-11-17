@@ -177,7 +177,6 @@ export function App() {
 
   const handleFunctions = useCallback(
     async functions => {
-      console.log(functions)
       setFunctionsText(functions)
 
       const data = await plotFunctions(
