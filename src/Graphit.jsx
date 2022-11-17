@@ -84,6 +84,7 @@ export const Graphit = memo(
       const [[xmin, xmax], [ymin, ymax]] = region
       const redraw = () => {
         // Clear background
+        ctx.lineJoin = 'round'
         ctx.fillStyle = theme.background
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 

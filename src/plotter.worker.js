@@ -104,7 +104,7 @@ self.__doc__ = {
 
 const auto = {
   sampling: 1500,
-  precisionPass: 16,
+  precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 64,
   straightness: 1e-6,
@@ -160,7 +160,7 @@ const dividePoints = (push, plotters, type, x1, y1, x2, y2, k) => {
     push(x, y)
   }
 }
-const increasePrecision = (points, plotters, type, region) => {
+const increasePrecision = (points, plotters, type, region, onlyStraight) => {
   const [[xmin, xmax], [ymin, ymax]] = region
   const newPoints = []
   const push = (x, y) => pushBounded(newPoints, x, y, region, type)
@@ -168,19 +168,22 @@ const increasePrecision = (points, plotters, type, region) => {
     dividePoints(push, plotters, type, x1, y1, x2, y2, k)
 
   const k = (ymax - ymin) / (xmax - xmin)
-  for (let i = 0; i < points.length; i += 4) {
+  let shift = 0
+  for (let i = 0; i + shift < points.length; i += 4) {
     // Reverse points in horizontal?
     const x1 = points[i]
     const y1 = points[i + 1]
-    const x2 = points[i + 2]
-    const y2 = points[i + 3]
-    const x3 = points[i + 4]
-    const y3 = points[i + 5]
+    const x2 = points[i + 2 + shift]
+    const y2 = points[i + 3 + shift]
+    const x3 = points[i + 4 + shift]
+    const y3 = points[i + 5 + shift]
 
     if (
       (type === 'linear' && (isNaN(y1) || isNaN(y2) || isNaN(y3))) ||
       (type === 'linear-horizontal' && (isNaN(x1) || isNaN(x2) || isNaN(x3)))
     ) {
+      i += shift
+      shift = 0
       push(x1, y1)
       push(x2, y2)
       continue
@@ -190,8 +193,25 @@ const increasePrecision = (points, plotters, type, region) => {
     const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
     const angle = angle23 - angle12
     const absAngle = Math.abs(angle)
-    const subdivide = absAngle > auto.precision
 
+    const distance =
+      ((x3 - x1) / (xmax - xmin)) ** 2 + ((y3 - y1) / (ymax - ymin)) ** 2
+
+    if (absAngle * distance < auto.straightness) {
+      i -= 4
+      shift += 2
+      continue
+    }
+    if (shift) {
+      i += shift
+      shift = 0
+    }
+    if (onlyStraight) {
+      push(x1, y1)
+      push(x2, y2)
+      continue
+    }
+    const subdivide = absAngle > auto.precision
     // This only works on linear (vertical)
     push(x1, y1)
 
@@ -267,54 +287,13 @@ const affineExtremums = (points, plotters, type, region) => {
   }
 }
 
-const removeUselessPoints = (points, type, region) => {
-  const [[xmin, xmax], [ymin, ymax]] = region
-  const newPoints = []
-  const k = (ymax - ymin) / (xmax - xmin)
-  let shift = 0
-  for (let i = 0; i + shift < points.length; i += 2) {
-    const x1 = points[i]
-    const y1 = points[i + 1]
-    const x2 = points[i + 2 + shift]
-    const y2 = points[i + 3 + shift]
-    const x3 = points[i + 4 + shift]
-    const y3 = points[i + 5 + shift]
-
-    if (
-      (type === 'linear' && (isNaN(y1) || isNaN(y2) || isNaN(y3))) ||
-      (type === 'linear-horizontal' && (isNaN(x1) || isNaN(x2) || isNaN(x3)))
-    ) {
-      i += shift
-      shift = 0
-      newPoints.push(x1, y1)
-      continue
-    }
-
-    const angle12 = Math.atan2(y2 - y1, k * (x2 - x1))
-    const angle23 = Math.atan2(y3 - y2, k * (x3 - x2))
-    const angle = angle23 - angle12
-    const distance =
-      ((x3 - x1) / (xmax - xmin)) ** 2 + ((y3 - y1) / (ymax - ymin)) ** 2
-
-    const skip = Math.abs(angle) * distance < auto.straightness
-
-    if (skip) {
-      i -= 2
-      shift += 2
-    } else {
-      newPoints.push(x1, y1)
-      i += shift
-      shift = 0
-    }
-  }
-  return newPoints
-}
-
 const adaptativePlot = (points, plotters, type, region) => {
+  // const t0 = performance.now()
   // const lens = [points.length]
-  points = removeUselessPoints(points, type, region)
+  points = increasePrecision(points, plotters, type, region, true)
   // lens.push(points.length)
   affineExtremums(points, plotters, type, region)
+  // lens.push(points.length)
   for (let i = 0; i < auto.precisionPass; i++) {
     if (points.length > auto.maxPoints) {
       // console.warn("Max points reached, can't subdivide anymore")
@@ -323,9 +302,8 @@ const adaptativePlot = (points, plotters, type, region) => {
     points = increasePrecision(points, plotters, type, region)
     // lens.push(points.length)
   }
-  points = removeUselessPoints(points, type, region)
   // lens.push(points.length)
-  // console.log(lens)
+  // console.log(performance.now() - t0, lens)
   return points
 }
 
