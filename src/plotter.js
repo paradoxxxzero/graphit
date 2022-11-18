@@ -40,11 +40,10 @@ export const plotFunctions = async (
   // Filter plot functions and affects
   for (let i = 0; i < functionsText.length; i++) {
     let recs
-    let { type, funs, min, max, samples, mode, recIndexes } = getFunctionParams(
+    let { type, funs, recIndexes, ...params } = getFunctionParams(
       functionsText[i],
       region,
-      precisions,
-      options
+      precisions
     )
     if (recIndexes) {
       recs = {}
@@ -53,7 +52,7 @@ export const plotFunctions = async (
     if (type === 'affect') {
       affects.push(funs)
     } else {
-      functionsTypeValues.push({ type, funs, min, max, samples, mode, recs })
+      functionsTypeValues.push({ type, funs, recs, ...params })
     }
   }
   // Create missing workers
@@ -66,21 +65,14 @@ export const plotFunctions = async (
 
   // Plot functions
   const data = await Promise.all(
-    functionsTypeValues.map(
-      ({ index, type, funs, min, max, samples, mode, recs }) =>
-        sendToPlotter(index, {
-          index,
-          type,
-          funs,
-          min,
-          max,
-          samples,
-          region,
-          affects,
-          mode,
-          recs,
-          ...options,
-        })
+    functionsTypeValues.map(({ index, ...params }) =>
+      sendToPlotter(index, {
+        index,
+        region,
+        affects,
+        ...params,
+        ...options,
+      })
     )
   )
 

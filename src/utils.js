@@ -30,7 +30,7 @@ export function orderRange(min, max, proj, minTick) {
   }
 }
 
-export function getFunctionParams(fun, region, precisions, options) {
+export function getFunctionParams(fun, region, precisions) {
   let match,
     type,
     funs,
@@ -38,17 +38,22 @@ export function getFunctionParams(fun, region, precisions, options) {
     min = null,
     max = null,
     samples = null,
+    rendering = null,
     mode = 'line'
-  if ((match = fun.match(/(.+)@\/(.+)$/))) {
-    fun = match[1]
+  if ((match = fun.match(/(.+)@\/([^@]+)(@.+|$)/))) {
+    fun = match[1] + (match[3] || '')
     mode = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@!(.+)$/))) {
-    fun = match[1]
+  if ((match = fun.match(/(.+)@!([^@]+)(@.+|$)/))) {
+    fun = match[1] + (match[3] || '')
     samples = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@(.+)->(.+)/))) {
-    fun = match[1]
+  if ((match = fun.match(/(.+)@\s*(auto|size|adaptative)\s*(@.+|$)/))) {
+    fun = match[1] + (match[3] || '')
+    rendering = match[2].trim()
+  }
+  if ((match = fun.match(/(.+)@(.+)->([^@]+)(@.+|$)/))) {
+    fun = match[1] + (match[4] || '')
     min = match[2].trim()
     max = match[3].trim()
   }
@@ -65,40 +70,28 @@ export function getFunctionParams(fun, region, precisions, options) {
     if (min === null) {
       ;[[min, max]] = region
     }
-    if (samples === 'size' || options.dimensions === 1) {
-      samples = precisions[0]
-    } else if (samples === null) {
-      samples = 'auto'
-    }
+    samples = samples || precisions[0]
   } else if ((match = fun.match(/^\s*x\s*=(.+)$/))) {
     type = 'linear-horizontal'
     funs = [match[1].trim()]
     if (min === null) {
       ;[, [min, max]] = region
     }
-    if (samples === 'size' || options.dimensions === 1) {
-      samples = precisions[1]
-    } else if (samples === null) {
-      samples = 'auto'
-    }
+    samples = samples || precisions[1]
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'
     funs = [match[1].trim()]
     if (min === null) {
       ;[min, max] = [0, 2 * Math.PI]
     }
-    if (samples === null) {
-      samples = Math.min(...precisions)
-    }
+    samples = samples || Math.min(...precisions)
   } else if ((match = fun.match(/^\s*{\s*x\s*=(.+),\s*y\s*=(.+)}\s*$/))) {
     type = 'parametric'
     funs = [match[1].trim(), match[2].trim()]
     if (min === null) {
       ;[min, max] = [0, 1]
     }
-    if (samples === null) {
-      samples = Math.min(...precisions)
-    }
+    samples = samples || Math.min(...precisions)
   } else if ((match = fun.match(/^\s*(\S+)\s*=(.+)$/))) {
     type = 'affect'
     funs = [match[1].trim(), match[2].trim()]
@@ -108,7 +101,6 @@ export function getFunctionParams(fun, region, precisions, options) {
     type = 'unknown'
     funs = [fun]
   }
-
   return {
     type,
     funs,
@@ -116,6 +108,7 @@ export function getFunctionParams(fun, region, precisions, options) {
     max,
     samples,
     mode,
+    rendering,
     recIndexes,
   }
 }

@@ -107,7 +107,7 @@ const auto = {
   precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 64,
-  straightness: 1e-6,
+  straightness: 1e-4,
   maxPoints: 10000,
 }
 
@@ -288,9 +288,14 @@ const affineExtremums = (points, plotters, type, region) => {
   }
 }
 
-const adaptativePlot = (points, plotters, type, region) => {
+const adaptativePlot = (plotters, type, region, min, max, step) => {
+  let points = []
   // const t0 = performance.now()
   // const lens = [points.length]
+  for (let n = min; n < max; n += step) {
+    const [x, y] = evalPoint(plotters, n, type)
+    pushBounded(points, x, y, region, type)
+  }
   points = increasePrecision(points, plotters, type, region, true)
   // lens.push(points.length)
   affineExtremums(points, plotters, type, region)
@@ -308,6 +313,65 @@ const adaptativePlot = (points, plotters, type, region) => {
   return points
 }
 
+const autoPlot = (plotters, type, region, min, max, step) => {
+  const points = []
+  const [[xmin, xmax], [ymin, ymax]] = region
+  const k = (ymax - ymin) / (xmax - xmin)
+  let point = [NaN, NaN],
+    last = [NaN, NaN],
+    next = evalPoint(plotters, min, type)
+  const [X, Y] = [0, 1]
+
+  for (let n = min; n <= max; n += step) {
+    point = next
+    next = evalPoint(plotters, n, type)
+
+    if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
+      const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
+      const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[Y]))
+      const angle = angleNext - angleLast
+      const absAngle = (angle + 2 * PI) % PI
+
+      const distance =
+        ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
+        ((next[Y] - last[Y]) / (ymax - ymin)) ** 2
+
+      if (absAngle * distance < auto.straightness) {
+        continue
+      }
+    }
+    last = point
+    points.push(point[X], point[Y])
+  }
+  points.push(next[X], next[Y])
+
+  console.log(points.length)
+  return points
+}
+
+const sizePlot = (plotters, type, region, min, max, step) => {
+  const points = []
+  for (let n = min; n < max; n += step) {
+    const [x, y] = evalPoint(plotters, n, type)
+    pushBounded(points, x, y, region, type)
+  }
+  return points
+}
+
+const evalPoint = (plotters, n, type) => {
+  if (type === 'parametric') {
+    return [plotters[0](n), plotters[1](n)]
+  } else if (type === 'polar') {
+    const r = plotters[0](n)
+    return [r * Math.cos(n), r * Math.sin(n)]
+  } else if (type === 'linear-horizontal') {
+    return [plotters[0](n), n]
+  } else if (type === 'linear') {
+    return [n, plotters[0](n)]
+  }
+  throw new Error(`Unknown plot type ${type}`)
+}
+
 const modes = ['line', 'dot', 'point']
 const affected = {}
 onmessage = ({
@@ -321,6 +385,7 @@ onmessage = ({
     region,
     affects,
     mode,
+    rendering,
     recs,
     dimensions = 2,
     uuid,
@@ -328,8 +393,7 @@ onmessage = ({
 }) => {
   let err = '',
     points = [],
-    values,
-    adaptative = false
+    values
 
   try {
     if (type === 'unknown') {
@@ -347,16 +411,18 @@ onmessage = ({
       max = new Function('return ' + max)()
     }
     if (typeof samples === 'string') {
-      if (samples === 'auto') {
-        adaptative = true
-        samples = auto.sampling
-      } else {
-        samples = new Function('return ' + samples)()
-      }
+      samples = new Function('return ' + samples)()
     }
     const step = (max - min) / samples
     if (isNaN(step) || step < 1e-9) {
       throw new Error(`Invalid step ${step}`)
+    }
+    if (!rendering) {
+      if (['linear', 'linear-horizontal'].includes(type)) {
+        rendering = 'auto'
+      } else {
+        rendering = 'size'
+      }
     }
     for (let i = 0; i < affects.length; i++) {
       const [name, valueText] = affects[i]
@@ -401,28 +467,12 @@ onmessage = ({
         values[i++] = val
       }
     } else if (dimensions === 2) {
-      for (let n = min; n < max; n += step) {
-        let x, y
-        if (type === 'parametric') {
-          x = plotters[0](n)
-          y = plotters[1](n)
-        } else if (type === 'polar') {
-          const r = plotters[0](n)
-          x = r * Math.cos(n)
-          y = r * Math.sin(n)
-        } else if (type === 'linear-horizontal') {
-          x = plotters[0](n)
-          y = n
-        } else {
-          x = n
-          y = plotters[0](n)
-        }
-        pushBounded(points, x, y, region, type)
-      }
-      if (adaptative) {
-        points = new Float32Array(
-          adaptativePlot(points, plotters, type, region)
-        )
+      if (rendering === 'size') {
+        points = sizePlot(plotters, type, region, min, max, step)
+      } else if (rendering === 'adaptative') {
+        points = adaptativePlot(plotters, type, region, min, max, step)
+      } else if (rendering === 'auto') {
+        points = autoPlot(plotters, type, region, min, max, step)
       }
       values = new Float32Array(points)
     }
