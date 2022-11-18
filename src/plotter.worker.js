@@ -142,6 +142,8 @@ const pushBounded = (points, x, y, region, type) => {
         ((points[points.length - 2] || region[0][0]) + points.out[0]) / 2,
         NaN
       )
+    } else {
+      points.push(NaN, NaN)
     }
     points.push(...points.out)
     points.out.splice(0)
