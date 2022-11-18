@@ -104,6 +104,7 @@ self.__doc__ = {
 
 const auto = {
   sampling: 1500,
+  subsampling: 20,
   precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 64,
@@ -322,26 +323,34 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     next = evalPoint(plotters, min, type)
   const [X, Y] = [0, 1]
 
-  for (let n = min; n <= max; n += step / 10) {
-    point = next
-    next = evalPoint(plotters, n, type)
+  for (let n = min; n <= max; n += step) {
+    for (let m = n; m < n + step; m += step / auto.subsampling) {
+      point = next
+      next = evalPoint(plotters, m, type)
 
-    if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
-      const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
-      const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[X]))
-      const angle = angleNext - angleLast
-      const absAngle = Math.abs(angle)
+      if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
+        const angleLast = Math.atan2(
+          point[Y] - last[Y],
+          k * (point[X] - last[X])
+        )
+        const angleNext = Math.atan2(
+          next[Y] - point[Y],
+          k * (next[X] - point[X])
+        )
+        const angle = angleNext - angleLast
+        const absAngle = Math.abs(angle)
 
-      const distance =
-        ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
-        ((next[Y] - last[Y]) / (ymax - ymin)) ** 2
+        const distance =
+          ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
+          ((next[Y] - last[Y]) / (ymax - ymin)) ** 2
 
-      if (absAngle * distance < auto.straightness) {
-        continue
+        if (absAngle * distance < auto.straightness) {
+          continue
+        }
       }
+      last = point
+      points.push(point[X], point[Y])
     }
-    last = point
-    points.push(point[X], point[Y])
   }
   points.push(next[X], next[Y])
 
