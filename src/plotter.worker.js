@@ -248,7 +248,6 @@ const affineExtremums = (points, plotters, type, region) => {
       continue
     }
 
-    // TODO: horizontal
     const sign01 = Math.sign(y1 - y0)
     const sign12 = Math.sign(y2 - y1)
     if (sign01 !== sign12) {
@@ -276,7 +275,7 @@ const affineExtremums = (points, plotters, type, region) => {
           xo0 = xm0
           xo2 = xm2
         }
-        if (yo > axisRegion[1] || yo < axisRegion[0]) {
+        if (xo0 === xo2 || yo > axisRegion[1] || yo < axisRegion[0]) {
           break
         }
       }
