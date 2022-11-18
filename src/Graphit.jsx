@@ -195,7 +195,7 @@ export const Graphit = memo(
           ctx.fill()
         }
       }
-      console.error(...errors)
+      console.warn(...errors)
       return true
     }, [
       region,
