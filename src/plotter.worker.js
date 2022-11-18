@@ -104,7 +104,7 @@ self.__doc__ = {
 
 const auto = {
   sampling: 1500,
-  subsampling: 20,
+  subsampling: 30,
   precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 64,
@@ -320,42 +320,106 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   const k = (ymax - ymin) / (xmax - xmin)
   let point = [NaN, NaN],
     last = [NaN, NaN],
-    next = evalPoint(plotters, min, type)
+    next = evalPoint(plotters, min, type),
+    block = null
   const [X, Y] = [0, 1]
+  let blocking = false
 
   for (let n = min; n <= max; n += step) {
+    let extrema = 0
+    let lastGrowthSign = Math.sign(next[Y] - point[Y])
+    let pair = [Infinity, -Infinity]
+    let pointsBase = points.length
+
     for (let m = n; m < n + step; m += step / auto.subsampling) {
       point = next
       next = evalPoint(plotters, m, type)
-
       if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
-        const angleLast = Math.atan2(
-          point[Y] - last[Y],
-          k * (point[X] - last[X])
-        )
-        const angleNext = Math.atan2(
-          next[Y] - point[Y],
-          k * (next[X] - point[X])
-        )
-        const angle = angleNext - angleLast
-        const absAngle = Math.abs(angle)
+        const growthSign = Math.sign(next[Y] - point[Y])
+        if (growthSign && lastGrowthSign && growthSign !== lastGrowthSign) {
+          extrema++
+        }
+        if (extrema > 1 && !blocking) {
+          blocking = true
+          block = []
+          const newPoints = points.splice(pointsBase)
+          for (let i = 0; i < newPoints.length; i++) {
+            const newPoint = newPoints[i]
+            pair[0] = Math.min(pair[0], newPoint[Y])
+            pair[1] = Math.max(pair[1], newPoint[Y])
+          }
+        }
+        lastGrowthSign = growthSign
+        if (!blocking) {
+          const angleLast = Math.atan2(
+            point[Y] - last[Y],
+            k * (point[X] - last[X])
+          )
+          const angleNext = Math.atan2(
+            next[Y] - point[Y],
+            k * (next[X] - point[X])
+          )
+          const angle = angleNext - angleLast
+          const absAngle = Math.abs(angle)
 
-        const distance =
-          ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
-          ((next[Y] - last[Y]) / (ymax - ymin)) ** 2
+          const distance =
+            ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
+            ((next[Y] - last[Y]) / (ymax - ymin)) ** 2
 
-        if (absAngle * distance < auto.straightness) {
-          continue
+          if (absAngle * distance < auto.straightness) {
+            continue
+          }
         }
       }
       last = point
-      points.push(point[X], point[Y])
+      if (blocking) {
+        pair[0] = Math.min(pair[0], point[Y])
+        pair[1] = Math.max(pair[1], point[Y])
+      } else {
+        points.push([point[X], point[Y]])
+      }
+    }
+    if (blocking) {
+      block.push([point[X], pair])
+
+      if (extrema <= 1) {
+        blocking = false
+        // Block marker
+        points.push([NaN, NaN])
+        for (let i = 0; i < block.length; i++) {
+          const [x, pair] = block[i]
+          points.push([x, pair[0]])
+        }
+        for (let i = block.length - 1; i >= 0; i--) {
+          const [x, pair] = block[i]
+          points.push([x, pair[1]])
+        }
+        // Block marker
+        points.push([NaN, NaN])
+        block = null
+      }
     }
   }
-  points.push(next[X], next[Y])
+  if (blocking) {
+    blocking = false
+    // Block marker
+    points.push([NaN, NaN])
+    for (let i = 0; i < block.length; i++) {
+      const [x, pair] = block[i]
+      points.push([x, pair[0]])
+    }
+    for (let i = block.length - 1; i >= 0; i--) {
+      const [x, pair] = block[i]
+      points.push([x, pair[1]])
+    }
+    // Block marker
+    points.push([NaN, NaN])
+    block = null
+  }
+  points.push([next[X], next[Y]])
 
   console.log(points.length)
-  return points
+  return points.flat()
 }
 
 const sizePlot = (plotters, type, region, min, max, step) => {

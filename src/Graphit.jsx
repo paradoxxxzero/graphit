@@ -157,18 +157,31 @@ export const Graphit = memo(
           continue
         }
         ctx.fillStyle = ctx.strokeStyle = theme.colors[index]
-
+        // ctx.fillStyle = 'white'
         ctx.beginPath()
-        let last = false
+        let line = false,
+          block = false
         for (let n = 0; n < values.length; n += 2) {
           if (isNaN(values[n]) || isNaN(values[n + 1])) {
-            last = false
+            if (isNaN(values[n]) && isNaN(values[n + 1])) {
+              if (block) {
+                ctx.closePath()
+                ctx.fill()
+                ctx.beginPath()
+                block = false
+              } else {
+                ctx.stroke()
+                ctx.beginPath()
+                block = true
+              }
+            }
+            line = false
             continue
           }
           const i = x2i(values[n])
           const j = y2j(values[n + 1])
           if (mode === 'line') {
-            if (last) {
+            if (line) {
               ctx.lineTo(i, j)
             } else {
               ctx.moveTo(i, j)
@@ -186,7 +199,7 @@ export const Graphit = memo(
             ctx.moveTo(i, j)
             ctx.arc(i, j, lineWidth, 0, TAU)
           }
-          last = true
+          line = true
         }
         if (mode === 'line') {
           ctx.stroke()
