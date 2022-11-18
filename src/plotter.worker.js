@@ -107,7 +107,7 @@ const auto = {
   precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 64,
-  straightness: 1e-4,
+  straightness: 1e-5,
   maxPoints: 10000,
 }
 
@@ -322,15 +322,15 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     next = evalPoint(plotters, min, type)
   const [X, Y] = [0, 1]
 
-  for (let n = min; n <= max; n += step) {
+  for (let n = min; n <= max; n += step / 10) {
     point = next
     next = evalPoint(plotters, n, type)
 
     if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
       const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
-      const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[Y]))
+      const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[X]))
       const angle = angleNext - angleLast
-      const absAngle = (angle + 2 * PI) % PI
+      const absAngle = Math.abs(angle)
 
       const distance =
         ((next[X] - last[X]) / (xmax - xmin)) ** 2 +
