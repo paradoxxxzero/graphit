@@ -1,5 +1,12 @@
 import { useGesture } from '@use-gesture/react'
-import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import './Graphit.css'
 import { plotFunctions } from './plotter'
 import { clamp, lerp, orderRange } from './utils'
@@ -19,13 +26,30 @@ export const Graphit = memo(
     onRegion,
   }) {
     const canvasRef = useRef(null)
+    const [title, setTitle] = useState('')
 
-    // TODO: Get rid of these
+    const i2x = useCallback(
+      i => {
+        const { width } = canvasRef.current
+        const [[xmin, xmax]] = region
+        return xmin + (xmax - xmin) * (i / width)
+      },
+      [region]
+    )
+
     const x2i = useCallback(
       x => {
         const { width } = canvasRef.current
         const [[xmin, xmax]] = region
         return (x - xmin) * (width / (xmax - xmin))
+      },
+      [region]
+    )
+    const j2y = useCallback(
+      j => {
+        const { height } = canvasRef.current
+        const [, [ymin, ymax]] = region
+        return ymin + (ymax - ymin) * ((height - j) / height)
       },
       [region]
     )
@@ -91,49 +115,52 @@ export const Graphit = memo(
         ctx.lineWidth = lineWidth * dpr
         // Draw axes
         ctx.strokeStyle = theme.axis
+        const i0 = clamp(x2i(0), 0, canvas.width)
+        const j0 = clamp(y2j(0), 0, canvas.height)
+        const sx = i0 > canvas.width / 2 ? -1 : 1
+        const sy = j0 > canvas.height / 2 ? -1 : 1
+
         ctx.beginPath()
-        ctx.moveTo(clamp(x2i(0), 0, canvas.width), 0)
-        ctx.lineTo(clamp(x2i(0), 0, canvas.width), canvas.height)
-        ctx.moveTo(0, clamp(y2j(0), 0, canvas.height))
-        ctx.lineTo(canvas.width, clamp(y2j(0), 0, canvas.height))
+        ctx.moveTo(i0, 0)
+        ctx.lineTo(i0, canvas.height)
+        ctx.moveTo(0, j0)
+        ctx.lineTo(canvas.width, j0)
         ctx.stroke()
 
         // Draw ticks
         ctx.strokeStyle = theme.tick
         ctx.fillStyle = theme.foreground
         ctx.textAlign = 'center'
-        ctx.textBaseline = 'top'
+        ctx.textBaseline = sy === 1 ? 'top' : 'bottom'
 
         ctx.beginPath()
         const xTick = orderRange(xmin, xmax, dx2di, MIN_TICK)
 
         for (let x = xTick.min; x < xTick.max; x += xTick.step) {
           const i = x2i(x)
-          const j = y2j(0)
 
-          ctx.moveTo(i, j)
-          ctx.lineTo(i, j + TICK_SIZE)
+          ctx.moveTo(i, j0)
+          ctx.lineTo(i, j0 + sy * TICK_SIZE)
           x &&
             ctx.fillText(
               xTick.precision ? x.toFixed(xTick.precision) : x,
               i,
-              j + TICK_SIZE * 2
+              j0 + sy * TICK_SIZE * 2
             )
         }
-        ctx.textAlign = 'left'
+        ctx.textAlign = sx === 1 ? 'left' : 'right'
         ctx.textBaseline = 'middle'
         const yTick = orderRange(ymin, ymax, dy2dj, MIN_TICK)
 
         for (let y = yTick.min; y < yTick.max; y += yTick.step) {
-          const i = x2i(0)
           const j = y2j(y)
 
-          ctx.moveTo(i + TICK_SIZE, j)
-          ctx.lineTo(i, j)
+          ctx.moveTo(i0 + sx * TICK_SIZE, j)
+          ctx.lineTo(i0, j)
           y &&
             ctx.fillText(
               yTick.precision ? y.toFixed(yTick.precision) : y,
-              i + TICK_SIZE * 2,
+              i0 + sx * TICK_SIZE * 2,
               j
             )
         }
@@ -157,7 +184,7 @@ export const Graphit = memo(
           continue
         }
         ctx.fillStyle = ctx.strokeStyle = theme.colors[index]
-        // ctx.fillStyle = 'white'
+        // ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
         ctx.beginPath()
         let line = false,
           block = false
@@ -336,6 +363,11 @@ export const Graphit = memo(
             [ymin + (dy - dymin), ymax - dymin],
           ])
         },
+        onMove: ({ xy: [i, j], dragging }) => {
+          if (!dragging) {
+            setTitle(`x = ${i2x(i)}\n y = ${j2y(j)}`)
+          }
+        },
       },
       {
         target: canvasRef,
@@ -345,6 +377,7 @@ export const Graphit = memo(
     return (
       <canvas
         ref={canvasRef}
+        title={title}
         className="canvas"
         style={hide ? { display: 'none' } : {}}
       />
