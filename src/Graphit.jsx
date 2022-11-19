@@ -151,7 +151,7 @@ export const Graphit = memo(
 
       for (let i = 0; i < data.length; i++) {
         if (!data[i]) continue
-        const { index, values, mode, err } = data[i]
+        const { index, values, mode, type, err } = data[i]
         if (err) {
           errors.push(err)
           continue
@@ -163,7 +163,11 @@ export const Graphit = memo(
           block = false
         for (let n = 0; n < values.length; n += 2) {
           if (isNaN(values[n]) || isNaN(values[n + 1])) {
-            if (isNaN(values[n]) && isNaN(values[n + 1])) {
+            if (
+              ['linear', 'linear-horizontal'].includes(type) &&
+              isNaN(values[n]) &&
+              isNaN(values[n + 1])
+            ) {
               if (block) {
                 ctx.closePath()
                 ctx.fill()
