@@ -319,7 +319,6 @@ const adaptativePlot = (plotters, type, region, min, max, step) => {
 const autoPlot = (plotters, type, region, min, max, step) => {
   const points = []
   const [[xmin, xmax], [ymin, ymax]] = region
-  const k = (ymax - ymin) / (xmax - xmin)
   let point = [NaN, NaN],
     last = [NaN, NaN],
     next = evalPoint(plotters, min, type),
@@ -327,6 +326,9 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   const [X, Y] = type === 'linear-horizontal' ? [1, 0] : [0, 1]
   const verticalRegion = region[type === 'linear-horizontal' ? 0 : 1]
   const horizontalRegion = region[type === 'linear-horizontal' ? 1 : 0]
+  const k =
+    (verticalRegion[1] - verticalRegion[0]) /
+    (horizontalRegion[1] - horizontalRegion[0])
 
   const regionEpsilon =
     (horizontalRegion[1] - horizontalRegion[0]) * auto.epsilon
@@ -348,8 +350,10 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       const absAngle = Math.abs(angle)
 
       const distance =
-        ((nextStep[X] - last[X]) / (xmax - xmin)) ** 2 +
-        ((nextStep[Y] - last[Y]) / (ymax - ymin)) ** 2
+        ((nextStep[X] - last[X]) /
+          (horizontalRegion[1] - horizontalRegion[0])) **
+          2 +
+        ((nextStep[Y] - last[Y]) / (verticalRegion[1] - verticalRegion[0])) ** 2
 
       if (absAngle * distance < auto.straightness) {
         continue
@@ -443,7 +447,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
                   : Math.max(pair[1], extremum[Y])
             }
           } else {
-            points.push(extremum[X], extremum[Y])
+            points.push(extremum[0], extremum[1])
           }
         }
         if (lastExtrema.length + extrema.length > 1 && !blocking) {
@@ -485,45 +489,61 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           for (let i = 0; i < block.length; i++) {
             const [x, pair] = block[i]
             if (pair[0] !== undefined) {
-              points.push(x, pair[0])
+              if (type === 'linear-horizontal') {
+                points.push(pair[0], x)
+              } else {
+                points.push(x, pair[0])
+              }
             }
           }
           for (let i = block.length - 1; i >= 0; i--) {
             const [x, pair] = block[i]
             if (pair[1] !== undefined) {
-              points.push(x, pair[1])
+              if (type === 'linear-horizontal') {
+                points.push(pair[1], x)
+              } else {
+                points.push(x, pair[1])
+              }
             }
           }
           // Block marker
           points.push(NaN, NaN)
           for (let i = 0; i < lastExtrema.length; i++) {
-            points.push(lastExtrema[i][X], lastExtrema[i][Y])
+            points.push(lastExtrema[i][0], lastExtrema[i][1])
           }
           for (let i = 0; i < extrema.length; i++) {
-            points.push(extrema[i][X], extrema[i][Y])
+            points.push(extrema[i][0], extrema[i][1])
           }
         } else {
           for (let i = 0; i < block.length; i++) {
             const [x, pair] = block[i]
             if (pair[i % 2] !== undefined) {
-              points.push(x, pair[i % 2])
+              if (type === 'linear-horizontal') {
+                points.push(pair[i % 2], x)
+              } else {
+                points.push(x, pair[i % 2])
+              }
             }
             if (pair[(i + 1) % 2] !== undefined) {
-              points.push(x, pair[(i + 1) % 2])
+              if (type === 'linear-horizontal') {
+                points.push(pair[(i + 1) % 2], x)
+              } else {
+                points.push(x, pair[(i + 1) % 2])
+              }
             }
           }
         }
         block = null
       }
     } else {
-      points.push(point[X], point[Y])
+      points.push(point[0], point[1])
     }
     lastExtrema = extrema
   }
 
-  points.push(next[X], next[Y])
+  points.push(next[0], next[1])
 
-  // console.log(points.length)
+  // console.log(points)
   return points
 }
 
