@@ -336,6 +336,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   let lastExtrema = []
   let currentStep
   let nextStep = min
+  let skip = false
+  let lastGrowthSign = 0
 
   for (let n = min; n <= max; n += step) {
     currentStep = nextStep
@@ -362,8 +364,9 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
     let extrema = []
     let extremum = null
-    let lastGrowthSign = 0
     let pair = [undefined, undefined]
+    let lastIsExtremum = false
+    let maybeAsymptote = false
 
     for (let m = n; m < n + step; m += step / auto.subsampling) {
       point = next
@@ -393,6 +396,16 @@ const autoPlot = (plotters, type, region, min, max, step) => {
               right - (right - left) / 3,
               type
             )
+            if (
+              (leftThird[Y] > verticalRegion[1] &&
+                rightThird[Y] < verticalRegion[0]) ||
+              (leftThird[Y] < verticalRegion[0] &&
+                rightThird[Y] > verticalRegion[1])
+            ) {
+              // Asymptote?
+              maybeAsymptote = true
+              break
+            }
             if (growthSign === -1) {
               if (leftThird[Y] < rightThird[Y]) {
                 left = leftThird[X]
@@ -418,20 +431,28 @@ const autoPlot = (plotters, type, region, min, max, step) => {
             ) {
               break
             }
-            if (
-              (leftThird[Y] > verticalRegion[1] &&
-                rightThird[Y] < verticalRegion[0]) ||
-              (leftThird[Y] < verticalRegion[0] &&
-                rightThird[Y] > verticalRegion[1])
-            ) {
-              // Assymptote?
-              // console.warn('ASS at ', leftThird, rightThird)
-              break
-            }
           }
           // Handle asymptotes
           extremum = evalPoint(plotters, (left + right) / 2, type)
+          if (maybeAsymptote) {
+            //TODO: Move up
+            const leftPart = evalPoint(plotters, left, type)
+            const rightPart = evalPoint(plotters, right, type)
+            if (
+              Math.sign(leftPart[Y] - extremum[Y]) ===
+              Math.sign(rightPart[Y] - extremum[Y])
+            ) {
+              points.push(leftPart[0], leftPart[1])
+              points.push((leftPart[0] + rightPart[0]) / 2, NaN)
+              points.push(rightPart[0], rightPart[1])
+              skip = true
+              lastGrowthSign = 0
+              continue
+            }
+          }
+
           extrema.push(extremum)
+
           if (blocking) {
             if (growthSign === 1) {
               // Minimum
@@ -447,7 +468,20 @@ const autoPlot = (plotters, type, region, min, max, step) => {
                   : Math.max(pair[1], extremum[Y])
             }
           } else {
+            if (
+              lastIsExtremum &&
+              Math.sign(extrema[extrema.length - 2][Y]) !==
+                Math.sign(extremum[Y])
+            ) {
+              // We have a vertical asymptote with a sign change
+              points.push(
+                (extrema[extrema.length - 2][X] + extremum[X]) / 2,
+                NaN
+              )
+              extrema.splice(-2)
+            }
             points.push(extremum[0], extremum[1])
+            lastIsExtremum = true
           }
         }
         if (lastExtrema.length + extrema.length > 1 && !blocking) {
@@ -475,7 +509,11 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       }
       last = point
     }
-
+    if (skip) {
+      skip = false
+      lastExtrema = extrema
+      continue
+    }
     if (blocking) {
       if (extrema.length > 0) {
         block.push([point[X], pair])
