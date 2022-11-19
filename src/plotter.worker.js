@@ -103,14 +103,14 @@ self.__doc__ = {
 }
 
 const auto = {
-  epsilon: 1e-7,
+  epsilon: 1e-9,
   sampling: 1500,
-  subsampling: 60,
+  subsampling: 24,
   minBlockSize: 10,
   precisionPass: 8,
   precision: PI / 1024,
-  extremumPass: 64,
-  straightness: 1e-5,
+  extremumPass: 16,
+  straightness: 1e-6,
   maxPoints: 10000,
 }
 
@@ -331,10 +331,13 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   const regionEpsilon =
     (horizontalRegion[1] - horizontalRegion[0]) * auto.epsilon
   let blocking = false
-  let lastExtrema = 0
+  let lastExtrema = []
+  let currentStep
+  let nextStep = min
 
   for (let n = min; n <= max; n += step) {
-    let nextStep = evalPoint(plotters, n, type)
+    currentStep = nextStep
+    nextStep = evalPoint(plotters, n, type)
     if (!isNaN(nextStep[Y]) && n < max - step) {
       const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
       const angleNext = Math.atan2(
@@ -353,23 +356,24 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       }
     }
 
-    let extrema = 0
+    let extrema = []
     let extremum = null
     let lastGrowthSign = 0
     let pair = [undefined, undefined]
 
     for (let m = n; m < n + step; m += step / auto.subsampling) {
       point = next
+
       next = evalPoint(plotters, m, type)
       if (!(isNaN(last[Y]) || isNaN(point[Y]) || isNaN(next[Y]))) {
         const growthSign = Math.sign(next[Y] - point[Y])
         if (
           growthSign !== 0 &&
           lastGrowthSign !== 0 &&
-          growthSign !== lastGrowthSign
+          growthSign !== lastGrowthSign &&
+          extrema.length < 2
         ) {
           // We have an extremum between last and next
-          extrema++
 
           let left = last[X]
           let right = next[X]
@@ -401,9 +405,11 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
             if (
               Math.abs(right - left) < regionEpsilon ||
-              (leftThird[Y] > verticalRegion[1] &&
+              (growthSign === -1 &&
+                leftThird[Y] > verticalRegion[1] &&
                 rightThird[Y] > verticalRegion[1]) ||
-              (leftThird[Y] < verticalRegion[0] &&
+              (growthSign === 1 &&
+                leftThird[Y] < verticalRegion[0] &&
                 rightThird[Y] < verticalRegion[0])
             ) {
               break
@@ -415,11 +421,13 @@ const autoPlot = (plotters, type, region, min, max, step) => {
                 rightThird[Y] > verticalRegion[1])
             ) {
               // Assymptote?
+              // console.warn('ASS at ', leftThird, rightThird)
               break
             }
           }
           // Handle asymptotes
           extremum = evalPoint(plotters, (left + right) / 2, type)
+          extrema.push(extremum)
           if (blocking) {
             if (growthSign === 1) {
               // Minimum
@@ -438,9 +446,26 @@ const autoPlot = (plotters, type, region, min, max, step) => {
             points.push(extremum[X], extremum[Y])
           }
         }
-        if (lastExtrema + extrema > 1 && !blocking) {
+        if (lastExtrema.length + extrema.length > 1 && !blocking) {
           blocking = true
-          block = [[point[X], [extremum[Y], extremum[Y]]]]
+          let min = Infinity
+          let max = -Infinity
+          for (let i = points.length - 2; i > 0; i -= 2) {
+            if (isNaN(points[i + Y])) {
+              continue
+            }
+            min = Math.min(min, points[i + Y])
+            max = Math.max(max, points[i + Y])
+            if (points[i + X] < currentStep[X]) {
+              break
+            }
+          }
+          block = []
+          if (min !== Infinity && max !== -Infinity) {
+            block = [[currentStep[X], [min, max]]]
+          }
+
+          continue
         }
         lastGrowthSign = growthSign
       }
@@ -448,11 +473,11 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     }
 
     if (blocking) {
-      if (extrema > 0) {
+      if (extrema.length > 0) {
         block.push([point[X], pair])
       }
 
-      if (extrema < 1 || n > max - step) {
+      if (extrema.length < 1 || n > max - step) {
         blocking = false
         // Block marker
         if (block.length > auto.minBlockSize) {
@@ -471,6 +496,12 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           }
           // Block marker
           points.push(NaN, NaN)
+          for (let i = 0; i < lastExtrema.length; i++) {
+            points.push(lastExtrema[i][X], lastExtrema[i][Y])
+          }
+          for (let i = 0; i < extrema.length; i++) {
+            points.push(extrema[i][X], extrema[i][Y])
+          }
         } else {
           for (let i = 0; i < block.length; i++) {
             const [x, pair] = block[i]
@@ -492,7 +523,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
   points.push(next[X], next[Y])
 
-  console.log(points.length)
+  // console.log(points.length)
   return points
 }
 
@@ -561,7 +592,7 @@ onmessage = ({
       samples = new Function('return ' + samples)()
     }
     const step = (max - min) / samples
-    if (isNaN(step) || step < 1e-9) {
+    if (isNaN(step) || step === 0) {
       throw new Error(`Invalid step ${step}`)
     }
     if (!rendering) {
