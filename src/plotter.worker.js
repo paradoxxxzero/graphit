@@ -407,11 +407,15 @@ const autoPlot = (plotters, type, region, min, max, step) => {
             if (blocking) {
               const leftExtremum = leftMiddleGrowth === 1 ? 'max' : 'min'
               const rightExtremum = rightMiddleGrowth === 1 ? 'max' : 'min'
-              blocking[leftExtremum].push(left, leftThird[Y])
-              blocking[rightExtremum].push(right, rightThird[Y])
+              blocking[leftExtremum].push(leftThird[0], leftThird[1])
+              blocking[rightExtremum].push(rightThird[0], rightThird[1])
             } else {
               points.push(leftThird[0], leftThird[1])
-              points.push((leftThird[0] + rightThird[0]) / 2, NaN)
+              if (type === 'linear-horizontal') {
+                points.push(NaN, (leftThird[1] + rightThird[1]) / 2)
+              } else {
+                points.push((leftThird[0] + rightThird[0]) / 2, NaN)
+              }
               points.push(rightThird[0], rightThird[1])
             }
             break
@@ -435,17 +439,24 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           Math.abs(right - left) < regionEpsilon ||
           j === auto.extremumPass - 1
         ) {
-          if (blocking) {
-            blocking[rightGrowth === -1 ? 'max' : 'min'].push(
-              left,
-              leftThird[Y]
-            )
-          } else {
-            if (
-              (rightGrowth === -1 && leftThird[Y] > rightThird[Y]) ||
-              (rightGrowth === 1 && leftThird[Y] < rightThird[Y])
-            ) {
+          if (
+            (rightGrowth === -1 && leftThird[Y] > rightThird[Y]) ||
+            (rightGrowth === 1 && leftThird[Y] < rightThird[Y])
+          ) {
+            if (blocking) {
+              blocking[rightGrowth === -1 ? 'max' : 'min'].push(
+                leftThird[0],
+                leftThird[1]
+              )
+            } else {
               points.push(leftThird[0], leftThird[1])
+            }
+          } else {
+            if (blocking) {
+              blocking[rightGrowth === -1 ? 'max' : 'min'].push(
+                rightThird[0],
+                rightThird[1]
+              )
             } else {
               points.push(rightThird[0], rightThird[1])
             }
@@ -496,36 +507,29 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     if (blocking) {
       if (consecutive < 1 || n > max - step) {
         // Closing block
+        // if (blocking.min.length > auto.minBlockSize) {
         // Start block marker
-        points.push(blocking.min[0], blocking.min[1])
-        points.push(blocking.max[0], blocking.max[1])
-
         points.push(NaN, NaN)
         for (let i = 0; i < blocking.min.length; i += 2) {
           points.push(blocking.min[i], blocking.min[i + 1])
         }
+        points.push(point[0], point[1])
         for (let i = blocking.max.length - 2; i >= 0; i -= 2) {
           points.push(blocking.max[i], blocking.max[i + 1])
         }
         points.push(NaN, NaN)
-        points.push(
-          blocking.min[blocking.min.length - 2],
-          blocking.min[blocking.min.length - 1]
-        )
-        points.push(
-          blocking.max[blocking.max.length - 2],
-          blocking.max[blocking.max.length - 1]
-        )
         points.push(point[0], point[1])
         // End block marker
+        // }
+
         blocking = null
       }
     } else if (consecutive > 1) {
       // We have a block
-      points.push(next[0], next[1])
+      // points.push(next[0], next[1])
       blocking = {
-        min: [],
-        max: [],
+        min: point.slice(),
+        max: point.slice(),
       }
     }
 
