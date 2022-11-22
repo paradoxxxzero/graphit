@@ -1,3 +1,4 @@
+import { clamp } from './utils'
 /* eslint-disable no-new-func */
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -320,8 +321,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   const points = []
   let point = [NaN, NaN],
     last = [NaN, NaN],
-    next = evalPoint(plotters, min, type),
-    block = null
+    next = evalPoint(plotters, min, type)
   const [X, Y] = type === 'linear-horizontal' ? [1, 0] : [0, 1]
   const verticalRegion = region[type === 'linear-horizontal' ? 0 : 1]
   const horizontalRegion = region[type === 'linear-horizontal' ? 1 : 0]
@@ -331,9 +331,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
   const regionEpsilon =
     (horizontalRegion[1] - horizontalRegion[0]) * auto.epsilon
-  let blocking = false
-  let lastExtrema = []
-  let currentStep
+  let blocking = null
+  let consecutive = 0
   let skipping = false
 
   for (let n = min; n <= max; n += step) {
@@ -348,7 +347,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     }
 
     // Start by removing straight lines
-    if (!isNaN(last[Y]) && n < max - step) {
+    if (!isNaN(last[Y]) && !blocking && n < max - step) {
       const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
       const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[X]))
       const angle = angleNext - angleLast
@@ -368,7 +367,10 @@ const autoPlot = (plotters, type, region, min, max, step) => {
         points.push(last[0], last[1])
       }
     }
-    points.push(point[0], point[1])
+
+    if (!blocking) {
+      points.push(point[0], point[1])
+    }
 
     // Then let's look for extremums
     let left = point[X]
@@ -379,8 +381,16 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     const leftGrowth = Math.sign(leftThird[Y] - point[Y])
     const centerGrowth = Math.sign(rightThird[Y] - leftThird[Y])
     const rightGrowth = Math.sign(next[Y] - rightThird[Y])
+
     // A change of growth sign means we have an extremum
     if (leftGrowth !== centerGrowth || centerGrowth !== rightGrowth) {
+      consecutive++
+      if (leftGrowth === rightGrowth) {
+        // A double change of growth sign means we have two extrema
+        // Likely a sampling issue or an asymptote
+        // consecutive++
+      }
+
       for (let j = 0; j < auto.extremumPass; j++) {
         if (
           (leftThird[Y] > verticalRegion[1] &&
@@ -390,13 +400,20 @@ const autoPlot = (plotters, type, region, min, max, step) => {
         ) {
           // Asymptote?
           const middle = evalPoint(plotters, (left + right) / 2, type)
-          if (
-            Math.sign(leftThird[Y] - middle[Y]) ===
-            Math.sign(rightThird[Y] - middle[Y])
-          ) {
-            points.push(leftThird[0], leftThird[1])
-            points.push((leftThird[0] + rightThird[0]) / 2, NaN)
-            points.push(rightThird[0], rightThird[1])
+          const leftMiddleGrowth = Math.sign(middle[Y] - leftThird[Y])
+          const rightMiddleGrowth = Math.sign(rightThird[Y] - middle[Y])
+
+          if (leftMiddleGrowth !== rightMiddleGrowth) {
+            if (blocking) {
+              const leftExtremum = leftMiddleGrowth === 1 ? 'max' : 'min'
+              const rightExtremum = rightMiddleGrowth === 1 ? 'max' : 'min'
+              blocking[leftExtremum].push(left, leftThird[Y])
+              blocking[rightExtremum].push(right, rightThird[Y])
+            } else {
+              points.push(leftThird[0], leftThird[1])
+              points.push((leftThird[0] + rightThird[0]) / 2, NaN)
+              points.push(rightThird[0], rightThird[1])
+            }
             break
           }
         }
@@ -418,12 +435,91 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           Math.abs(right - left) < regionEpsilon ||
           j === auto.extremumPass - 1
         ) {
-          points.push(leftThird[0], leftThird[1])
-          points.push(rightThird[0], rightThird[1])
+          if (blocking) {
+            blocking[rightGrowth === -1 ? 'max' : 'min'].push(
+              left,
+              leftThird[Y]
+            )
+          } else {
+            points.push(leftThird[0], leftThird[1])
+            points.push(rightThird[0], rightThird[1])
+          }
           break
         }
         leftThird = evalPoint(plotters, left + (right - left) / 3, type)
         rightThird = evalPoint(plotters, right - (right - left) / 3, type)
+      }
+    } else {
+      if (consecutive > 0) {
+        const samples = 20
+        let lastPoint = null
+        let lastGrowth = 0
+        let extremum = false
+        for (let i = 0; i <= samples; i++) {
+          let currentPoint =
+            i === 0
+              ? point
+              : i === samples
+              ? next
+              : evalPoint(
+                  plotters,
+                  ((samples - i) * point[X] + i * next[X]) / samples,
+                  type
+                )
+          if (lastPoint) {
+            const growth = Math.sign(currentPoint[Y] - lastPoint[Y])
+            if (lastGrowth && growth !== lastGrowth) {
+              extremum = true
+              break
+            }
+            lastGrowth = growth
+          }
+          lastPoint = currentPoint
+        }
+        if (extremum) {
+          consecutive++
+        } else {
+          consecutive--
+        }
+      } else {
+        consecutive--
+      }
+    }
+    consecutive = clamp(consecutive, 0, 3)
+
+    if (blocking) {
+      if (consecutive < 1 || n > max - step) {
+        // Closing block
+        // Start block marker
+        points.push(blocking.min[0], blocking.min[1])
+        points.push(blocking.max[0], blocking.max[1])
+
+        points.push(NaN, NaN)
+        for (let i = 0; i < blocking.min.length; i += 2) {
+          points.push(blocking.min[i], blocking.min[i + 1])
+        }
+        for (let i = blocking.max.length - 2; i >= 0; i -= 2) {
+          points.push(blocking.max[i], blocking.max[i + 1])
+        }
+        points.push(NaN, NaN)
+        points.push(
+          blocking.min[blocking.min.length - 2],
+          blocking.min[blocking.min.length - 1]
+        )
+        points.push(
+          blocking.max[blocking.max.length - 2],
+          blocking.max[blocking.max.length - 1]
+        )
+        points.push(point[0], point[1])
+        // End block marker
+        blocking = null
+      }
+    } else if (consecutive > 1) {
+      // We have a block
+      points.push(next[0], next[1])
+      blocking = {
+        min: [],
+        max: [],
       }
     }
 
