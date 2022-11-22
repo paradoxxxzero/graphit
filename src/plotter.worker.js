@@ -441,8 +441,14 @@ const autoPlot = (plotters, type, region, min, max, step) => {
               leftThird[Y]
             )
           } else {
-            points.push(leftThird[0], leftThird[1])
-            points.push(rightThird[0], rightThird[1])
+            if (
+              (rightGrowth === -1 && leftThird[Y] > rightThird[Y]) ||
+              (rightGrowth === 1 && leftThird[Y] < rightThird[Y])
+            ) {
+              points.push(leftThird[0], leftThird[1])
+            } else {
+              points.push(rightThird[0], rightThird[1])
+            }
           }
           break
         }
