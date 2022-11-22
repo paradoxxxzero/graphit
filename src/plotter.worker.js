@@ -106,13 +106,14 @@ self.__doc__ = {
 const auto = {
   epsilon: 1e-9,
   sampling: 1500,
-  subsampling: 2,
+  subsampling: 32,
   minBlockSize: 10,
   precisionPass: 8,
   precision: PI / 1024,
   extremumPass: 32,
   straightness: 1e-5,
   maxPoints: 10000,
+  overflow: 0.1,
 }
 
 const pushBounded = (points, x, y, region, type) => {
@@ -318,8 +319,9 @@ const adaptativePlot = (plotters, type, region, min, max, step) => {
 }
 
 const autoPlot = (plotters, type, region, min, max, step) => {
-  min -= 20 * step
-  max += 20 * step
+  const len = max - min
+  min -= (len * auto.overflow) / 2
+  max += (len * auto.overflow) / 2
 
   const points = []
   let point = [NaN, NaN],
@@ -410,6 +412,9 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           const rightMiddleGrowth = Math.sign(rightThird[Y] - middle[Y])
 
           if (leftMiddleGrowth !== rightMiddleGrowth) {
+            // TODO : check if asymptote or simply a range issue
+            // y = osc(2, x, 'square') for instance
+            // y = exp(tan(x))
             if (leftThird[Y] > rightThird[Y]) {
               consecutive.max.push(leftThird)
               consecutive.min.push(rightThird)
@@ -481,19 +486,19 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       }
     } else {
       if (consecutive.max.length + consecutive.min.length > 0) {
-        const samples = 20
         let lastPoint = null
         let lastGrowth = 0
         let extremum = false
-        for (let i = 0; i <= samples; i++) {
+        for (let i = 0; i <= auto.subsampling; i++) {
           let currentPoint =
             i === 0
               ? point
-              : i === samples
+              : i === auto.subsampling
               ? next
               : evalPoint(
                   plotters,
-                  ((samples - i) * point[X] + i * next[X]) / samples,
+                  ((auto.subsampling - i) * point[X] + i * next[X]) /
+                    auto.subsampling,
                   type
                 )
           if (lastPoint) {
@@ -535,8 +540,13 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           for (let i = 0; i < blocking.min.length; i += 2) {
             points.push(blocking.min[i], blocking.min[i + 1])
           }
-          points.push(point[0], blocking.min[blocking.min.length - 1])
-          points.push(point[0], blocking.max[blocking.max.length - 1])
+          if (type === 'linear-horizontal') {
+            points.push(blocking.min[blocking.min.length - 2], point[1])
+            points.push(blocking.max[blocking.max.length - 2], point[1])
+          } else {
+            points.push(point[0], blocking.min[blocking.min.length - 1])
+            points.push(point[0], blocking.max[blocking.max.length - 1])
+          }
           for (let i = blocking.max.length - 2; i >= 0; i -= 2) {
             points.push(blocking.max[i], blocking.max[i + 1])
           }
@@ -558,8 +568,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       const x = Math.min(min[X], max[X])
       // points.splice(points.length - 2)
       blocking = {
-        min: [x, min[Y]],
-        max: [x, max[Y]],
+        min: type === 'linear-horizontal' ? [min[Y], x] : [x, min[Y]],
+        max: type === 'linear-horizontal' ? [max[Y], x] : [x, max[Y]],
       }
     }
   }
