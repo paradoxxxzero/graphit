@@ -1,4 +1,3 @@
-import { clamp } from './utils'
 /* eslint-disable no-new-func */
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
