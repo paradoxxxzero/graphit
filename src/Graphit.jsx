@@ -209,8 +209,9 @@ export const Graphit = memo(
             line = false
             continue
           }
-          const i = x2i(values[n])
-          const j = y2j(values[n + 1])
+          const i = clamp(x2i(values[n]), -(2 ** 31), 2 ** 31)
+          const j = clamp(y2j(values[n + 1]), -(2 ** 31), 2 ** 31)
+
           if (mode === 'line') {
             if (line) {
               ctx.lineTo(i, j)
