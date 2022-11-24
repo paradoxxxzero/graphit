@@ -24,6 +24,7 @@ export const Graphit = memo(
     hide,
     recordings,
     onRegion,
+    codeRef,
   }) {
     const canvasRef = useRef(null)
     const [title, setTitle] = useState('')
@@ -116,7 +117,11 @@ export const Graphit = memo(
         // Draw axes
         ctx.strokeStyle = theme.axis
         const i0 = clamp(x2i(0), 0, canvas.width)
-        const j0 = clamp(y2j(0), 0, canvas.height)
+        const j0 = clamp(
+          y2j(0),
+          0,
+          canvas.height - codeRef.current.getBoundingClientRect().height
+        )
         const sx = i0 > canvas.width / 2 ? -1 : 1
         const sy = j0 > canvas.height / 2 ? -1 : 1
 
@@ -254,6 +259,7 @@ export const Graphit = memo(
       lineWidth,
       x2i,
       y2j,
+      codeRef,
       dx2di,
       dy2dj,
     ])
@@ -261,13 +267,12 @@ export const Graphit = memo(
     const size = useCallback(() => {
       const canvas = canvasRef.current
       const dpr = window.devicePixelRatio || 1
-      const { width, height } = canvas.parentNode.getBoundingClientRect()
 
       const oldWidth = canvas.width
       const oldHeight = canvas.height
 
-      canvas.width = width * dpr
-      canvas.height = height * dpr
+      canvas.width = window.innerWidth * dpr
+      canvas.height = window.innerHeight * dpr
 
       // Don't resize region if it was the initial one
       if (oldWidth === 300 && oldHeight === 150) {

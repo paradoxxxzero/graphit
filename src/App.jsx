@@ -171,6 +171,7 @@ export function App() {
   const [recordings, setRecordings] = useState([])
   const [saveUrl, setSaveUrl] = useState(null)
   const wrapperRef = useRef()
+  const codeRef = useRef()
 
   const handleResetRegion = useCallback(() => {
     const wrapper = wrapperRef.current
@@ -240,7 +241,7 @@ export function App() {
       createTheme({
         theme: 'light',
         settings: {
-          background: 'rgba(125, 125, 125, 0.1)',
+          background: theme.overlay,
           foreground: theme.foreground,
           caret: theme.tick,
           selection: 'rgba(125, 125, 125, 0.3)',
@@ -270,6 +271,7 @@ export function App() {
   const themeVars = useMemo(
     () => ({
       '--background': theme.background,
+      '--overlay': theme.overlay,
       '--foreground': theme.foreground,
       '--error': theme.error,
       '--axis': theme.axis,
@@ -533,7 +535,8 @@ export function App() {
             lineWidth={state.lineWidth}
             onRegion={region => dispatch({ type: 'region', region })}
             hide={displaySpectrogram}
-          ></Graphit>
+            codeRef={codeRef}
+          />
         ) : null}
         <Audio
           functions={state.functions}
@@ -552,7 +555,7 @@ export function App() {
           <Spectrogram data={spectrograms} theme={theme} />
         )}
       </div>
-      <div className={`function${errors.length ? ' error' : ''}`}>
+      <div className={`function${errors.length ? ' error' : ''}`} ref={codeRef}>
         <pre className="errors">{errors.map(e => e.message).join(', ')}</pre>
         <div className="functionsText">
           <CodeMirror

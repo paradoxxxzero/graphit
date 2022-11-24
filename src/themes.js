@@ -1,6 +1,7 @@
 export default {
   tango: {
     background: '#1b1d1e',
+    overlay: '#2e2e2e70',
     foreground: '#a0a0a0',
     error: '#995555',
     axis: '#5e3fbe',
@@ -26,6 +27,7 @@ export default {
   },
   solarized: {
     background: '#002b36',
+    overlay: '#07364270',
     foreground: '#839496',
     error: '#dc322f',
     axis: '#5e3fbe',
@@ -51,6 +53,7 @@ export default {
   },
   monokai: {
     background: '#272822',
+    overlay: '#3e3d3270',
     foreground: '#f8f8f2',
     error: '#f92672',
     axis: '#5e3fbe',
@@ -76,6 +79,7 @@ export default {
   },
   dracula: {
     background: '#282a36',
+    overlay: '#44475a70',
     foreground: '#f8f8f2',
     error: '#ff5555',
     axis: '#5e3fbe',
@@ -101,6 +105,7 @@ export default {
   },
   nord: {
     background: '#2e3440',
+    overlay: '#3b425270',
     foreground: '#d8dee9',
     error: '#bf616a',
     axis: '#5e3fbe',
@@ -126,6 +131,7 @@ export default {
   },
   oneDark: {
     background: '#282c34',
+    overlay: '#3e445170',
     foreground: '#abb2bf',
     error: '#e06c75',
     axis: '#5e3fbe',
@@ -151,6 +157,7 @@ export default {
   },
   oneLight: {
     background: '#fafafa',
+    overlay: '#eaeaea70',
     foreground: '#5c6370',
     error: '#e06c75',
     axis: '#5e3fbe',
@@ -176,6 +183,7 @@ export default {
   },
   gruvbox: {
     background: '#282828',
+    overlay: '#3c383670',
     foreground: '#ebdbb2',
     error: '#fb4934',
     axis: '#5e3fbe',
@@ -201,6 +209,7 @@ export default {
   },
   tokyonight: {
     background: '#1a1b26',
+    overlay: '#2d2e4370',
     foreground: '#c0caf5',
     error: '#f7768e',
     axis: '#5e3fbe',
@@ -226,6 +235,7 @@ export default {
   },
   palenight: {
     background: '#292d3e',
+    overlay: '#3e445170',
     foreground: '#d6deeb',
     error: '#ff5370',
     axis: '#5e3fbe',
@@ -251,6 +261,7 @@ export default {
   },
   darkplus: {
     background: '#1e1e1e',
+    overlay: '#2d2d2d70',
     foreground: '#d4d4d4',
     error: '#f48771',
     axis: '#5e3fbe',
@@ -276,6 +287,7 @@ export default {
   },
   lightplus: {
     background: '#ffffff',
+    overlay: '#eaeaea70',
     foreground: '#4d4d4c',
     error: '#c82829',
     axis: '#5e3fbe',
@@ -301,6 +313,7 @@ export default {
   },
   github: {
     background: '#ffffff',
+    overlay: '#eaeaea70',
     foreground: '#333333',
     error: '#f00',
     axis: '#5e3fbe',

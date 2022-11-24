@@ -13,13 +13,15 @@
 }
 
 .function {
-  position: relative;
+  position: fixed;
+  width: 100%;
+  bottom: 0;
   display: flex;
   flex-direction: column;
 }
 
 .function .cm-theme {
-  margin: .5em 1em;
+  margin: 1em 1em .5em;
   flex: 1;
   font-size: 1.1em;
 
@@ -34,27 +36,31 @@
   outline: 2px solid var(--error);
 }
 
+.function .cm-theme {
+  backdrop-filter: blur(5px);
+}
 .function .cm-editor {
   padding-right: 2.5em;
 }
 .function .cm-scroller {
   padding: .75em 0 .75em .75em;
 }
-.function .cm-scroller::-webkit-scrollbar {
+.function .cm-scroller::-webkit-scrollbar, .function .cm-editor .cm-tooltip-autocomplete ul::-webkit-scrollbar {
   width: 5px;
   height: 5px;
   background-color: rgba(0, 0, 0, 0.1);
 }
-.function .cm-scroller::-webkit-scrollbar-thumb {
+.function .cm-scroller::-webkit-scrollbar-thumb .function .cm-editor .cm-tooltip-autocomplete ul::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.2);
 }
 .function .cm-scroller {
   scrollbar-width: thin;
 }
 
-.function .cm-editor .cm-tooltip-autocomplete {
-  background-color: var(--background);
-  border-color: var(--background);
+.function .cm-editor .cm-tooltip-autocomplete, .function .cm-editor .cm-completionInfo {
+  backdrop-filter: blur(10px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border: none;
   color: var(--foreground);
 }
 
@@ -72,7 +78,7 @@
 
 .functionsText button {
   position: absolute;
-  top: calc(50% - 0.6em);
+  top: 0.85em;
   right: 0.65em;
   border: none;
   background-color: transparent;
