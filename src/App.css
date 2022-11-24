@@ -3,7 +3,9 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  background-color: var(--background);
 }
+
 .wrapper {
   flex: 1 1 auto;
   overflow: hidden;
@@ -12,27 +14,48 @@
 
 .function {
   position: relative;
-  font-size: 0.75em;
-  text-align: center;
   display: flex;
   flex-direction: column;
 }
 
-.function input {
+.function .cm-theme {
   margin: .5em 1em;
-  padding: 1em 3em 1em 1em;
-  font-size: 1.5em;
-  font-family: monospace;
   flex: 1;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  outline: none;
-  min-width: 0;
-  position: relative;
+  font-size: 1.1em;
+
 }
-.function input::selection {
-  background: rgba(0, 0, 0, 0.3);
-  color:rgba(255, 255, 255, 0.8)
+
+.function .cm-editor.cm-focused {
+  outline: 2px solid var(--foreground);
+  transition: outline 0.1s ease-in-out;
+}
+
+.function.error .cm-editor {
+  outline: 2px solid var(--error);
+}
+
+.function .cm-editor {
+  padding-right: 2.5em;
+}
+.function .cm-scroller {
+  padding: .75em 0 .75em .75em;
+}
+.function .cm-scroller::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+.function .cm-scroller::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.function .cm-scroller {
+  scrollbar-width: thin;
+}
+
+.function .cm-editor .cm-tooltip-autocomplete {
+  background-color: var(--background);
+  border-color: var(--background);
+  color: var(--foreground);
 }
 
 .function .errors {
@@ -40,17 +63,17 @@
   position: absolute;
   left: 1em;
   top: -2em;
+  color: var(--error);
 }
 
 .functionsText {
-  display: flex;
   flex-direction: row;
 }
 
 .functionsText button {
   position: absolute;
-  top: calc(50% - 0.5em);
-  right: 0.75em;
+  top: calc(50% - 0.6em);
+  right: 0.65em;
   border: none;
   background-color: transparent;
   font-size: 2em;

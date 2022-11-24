@@ -1,14 +1,21 @@
+import { autocompletion } from '@codemirror/autocomplete'
+import { javascript } from '@codemirror/lang-javascript'
+import { tags as t } from '@lezer/highlight'
+import { createTheme } from '@uiw/codemirror-themes'
+import CodeMirror from '@uiw/react-codemirror'
 import qs from 'qs'
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
 } from 'react'
 import './App.css'
 import { Audio } from './Audio'
+import doc from './doc'
 import { Graphit } from './Graphit'
 import { plotFunctions } from './plotter'
 import { Spectrogram } from './Spectrogram'
@@ -23,7 +30,7 @@ const initialState = {
   region: null,
   loop: false,
   functions:
-    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) ; r = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1000 ; k = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! 1000',
+    'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) \nr = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1000 \nk = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! 1000',
 }
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
@@ -135,6 +142,20 @@ function urlMiddleware(reducer) {
     return state
   }
 }
+function plotCompletions(context) {
+  // const { state } = context
+  // const funs = state.languageDataAt('autocomplete', context.pos)
+  let word = context.matchBefore(/\w*/)
+  if (word.from === word.to && !context.explicit) return null
+  return {
+    from: word.from,
+    options: Object.entries(doc).map(([label, info]) => ({
+      label,
+      type: 'function',
+      info,
+    })),
+  }
+}
 
 export function App() {
   const [errors, setErrors] = useState([])
@@ -213,6 +234,52 @@ export function App() {
   }, [state.functions])
 
   const theme = themes[state.theme]
+
+  const cmTheme = useMemo(
+    () =>
+      createTheme({
+        theme: 'light',
+        settings: {
+          background: 'rgba(125, 125, 125, 0.1)',
+          foreground: theme.foreground,
+          caret: theme.tick,
+          selection: 'rgba(125, 125, 125, 0.3)',
+          selectionMatch: 'rgba(125, 125, 125, 0.15)',
+          fontFamily: '"Fira Code", "Source Code Pro", monospace',
+        },
+        styles: [
+          { tag: t.variableName, color: theme.colors[13] },
+          { tag: [t.string, t.special(t.brace)], color: theme.colors[1] },
+          { tag: t.number, color: theme.colors[2] },
+          { tag: t.bool, color: theme.colors[3] },
+          { tag: t.null, color: theme.colors[4] },
+          { tag: t.keyword, color: theme.colors[5] },
+          { tag: t.operator, color: theme.colors[6] },
+          { tag: t.className, color: theme.colors[7] },
+          { tag: t.definition(t.typeName), color: theme.colors[8] },
+          { tag: t.typeName, color: theme.colors[9] },
+          { tag: t.angleBracket, color: theme.colors[10] },
+          { tag: t.tagName, color: theme.colors[11] },
+          { tag: t.attributeName, color: theme.colors[12] },
+          { tag: t.comment, color: theme.colors[14] },
+        ],
+      }),
+    [theme]
+  )
+
+  const themeVars = useMemo(
+    () => ({
+      '--background': theme.background,
+      '--foreground': theme.foreground,
+      '--error': theme.error,
+      '--axis': theme.axis,
+      '--tick': theme.tick,
+      ...Object.fromEntries(
+        theme.colors.map((color, i) => [`--color-${i}`, color])
+      ),
+    }),
+    [theme]
+  )
 
   const toggleSettings = useCallback(() => {
     setSettingsOpen(settingsOpen => !settingsOpen)
@@ -301,7 +368,7 @@ export function App() {
   }, [])
 
   return (
-    <div className="App" style={{ backgroundColor: theme.background }}>
+    <div className="App" style={themeVars}>
       <div className="controls">
         <button
           className="button"
@@ -485,23 +552,22 @@ export function App() {
           <Spectrogram data={spectrograms} theme={theme} />
         )}
       </div>
-      <div className="function">
-        <pre className="errors" style={{ color: theme.error }}>
-          {errors.map(e => e.message).join(', ')}
-        </pre>
+      <div className={`function${errors.length ? ' error' : ''}`}>
+        <pre className="errors">{errors.map(e => e.message).join(', ')}</pre>
         <div className="functionsText">
-          <input
-            type="text"
+          <CodeMirror
             value={functionsText}
-            autoCapitalize="off"
-            autoComplete="off"
-            spellCheck="false"
-            translate="no"
-            autoFocus
-            style={{
-              color: errors.length ? theme.error : theme.foreground,
+            basicSetup={{
+              foldGutter: false,
+              lineNumbers: false,
+              highlightActiveLine: false,
             }}
-            onChange={e => handleFunctions(e.target.value)}
+            theme={cmTheme}
+            extensions={[
+              javascript({ jsx: true }),
+              autocompletion({ override: [plotCompletions] }),
+            ]}
+            onChange={handleFunctions}
           />
           <button onClick={() => setFunctionsText('')}>
             <svg

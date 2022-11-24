@@ -34,7 +34,7 @@ export const plotFunctions = async (
   recordings,
   options = {}
 ) => {
-  const functionsText = functions.split(';').map(fun => fun.trim())
+  const functionsText = functions.split(/[;\n]/).map(fun => fun.trim())
   const affects = []
   const functionsTypeValues = []
   // Filter plot functions and affects

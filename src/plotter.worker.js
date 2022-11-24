@@ -1,4 +1,7 @@
 /* eslint-disable no-new-func */
+
+import doc from './doc'
+
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
   linear: 'x',
@@ -77,65 +80,9 @@ self.segment = (x, ...pairs) => {
 
 self.at = (d, f, x) => f(x + d)
 
-self.__doc__ = {
-  // Sound functions
-  [self.adsr]:
-    'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5)',
-  [self.osc]:
-    'osc usage: (freq, x, type = sine|square|smoothsquare|sawtooth|triangle, e = 0.01)',
-  [self.oscs]:
-    'oscs usage: (freqs, x, type = sine|square|smoothsquare|sawtooth|triangle, e = 0.01)',
-  [self.lowPass]: 'lowPass usage: (f, x, _, rc = 0.0005, sampleRate = 44100)',
-  [self.highPass]: 'highPass usage: (f, x, _, rc = 0.0005, sampleRate = 44100)',
-  [self.segment]: 'segment usage: (x, ...pairs)',
-  [self.at]: 'at usage: (d, f, x)',
-
-  // MATH functions
-  [self.abs]: 'Returns the absolute value of x.',
-  [self.acos]: 'Returns the arccosine of x.',
-  [self.acosh]: 'Returns the hyperbolic arccosine of x.',
-  [self.asin]: 'Returns the arcsine of x.',
-  [self.asinh]: 'Returns the hyperbolic arcsine of a number.',
-  [self.atan]: 'Returns the arctangent of x.',
-  [self.atanh]: 'Returns the hyperbolic arctangent of x.',
-  [self.atan2]: 'Returns the arctangent of the quotient of its arguments.',
-  [self.cbrt]: 'Returns the cube root of x.',
-  [self.ceil]: 'Returns the smallest integer greater than or equal to x.',
-  [self.clz32]:
-    'Returns the number of leading zero bits of the 32-bit integer x.',
-  [self.cos]: 'Returns the cosine of x.',
-  [self.cosh]: 'Returns the hyperbolic cosine of x.',
-  [self.exp]:
-    "Returns ex, where x is the argument, and e is Euler's constant (2.718…, the base of the natural logarithm).",
-  [self.expm1]: 'Returns subtracting 1 from exp(x).',
-  [self.floor]: 'Returns the largest integer less than or equal to x.',
-  [self.fround]:
-    'Returns the nearest single precision float representation of x.',
-  [self.hypot]:
-    'Returns the square root of the sum of squares of its arguments.',
-  [self.imul]:
-    'Returns the result of the 32-bit integer multiplication of x and y.',
-  [self.log]: 'Returns the natural logarithm (㏒e; also, ㏑) of x.',
-  [self.log1p]:
-    'Returns the natural logarithm (㏒e; also ㏑) of 1 + x for the number x.',
-  [self.log10]: 'Returns the base-10 logarithm of x.',
-  [self.log2]: 'Returns the base-2 logarithm of x.',
-  [self.max]: 'Returns the largest of zero or more numbers.',
-  [self.min]: 'Returns the smallest of zero or more numbers.',
-  [self.pow]: 'Returns base x to the exponent power y (that is, xy).',
-  [self.random]: 'Returns a pseudo-random number between 0 and 1.',
-  [self.round]:
-    'Returns the value of the number x rounded to the nearest integer.',
-  [self.sign]:
-    'Returns the sign of the x, indicating whether x is positive, negative, or zero.',
-  [self.sin]: 'Returns the sine of x.',
-  [self.sinh]: 'Returns the hyperbolic sine of x.',
-  [self.sqrt]: 'Returns the positive square root of x.',
-  [self.tan]: 'Returns the tangent of x.',
-  [self.tanh]: 'Returns the hyperbolic tangent of x.',
-  [self.trunc]:
-    'Returns the integer portion of x, removing any fractional digits.',
-}
+self.__doc__ = Object.fromEntries(
+  Object.entries(doc).map((k, v) => [self[k], v])
+)
 
 const auto = {
   epsilon: 1e-9,
