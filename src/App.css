@@ -45,23 +45,28 @@
 .function .cm-scroller {
   padding: .75em 0 .75em .75em;
 }
-.function .cm-scroller::-webkit-scrollbar, .function .cm-editor .cm-tooltip-autocomplete ul::-webkit-scrollbar {
+.function .cm-scroller::-webkit-scrollbar, .cm-tooltip-autocomplete ul::-webkit-scrollbar {
   width: 5px;
   height: 5px;
   background-color: rgba(0, 0, 0, 0.1);
 }
-.function .cm-scroller::-webkit-scrollbar-thumb .function .cm-editor .cm-tooltip-autocomplete ul::-webkit-scrollbar-thumb {
+.function .cm-scroller::-webkit-scrollbar-thumb .cm-tooltip-autocomplete ul::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.2);
 }
 .function .cm-scroller {
   scrollbar-width: thin;
 }
 
-.function .cm-editor .cm-tooltip-autocomplete, .function .cm-editor .cm-completionInfo {
+.cm-tooltip.cm-tooltip-autocomplete, .cm-tooltip .cm-completionInfo {
   backdrop-filter: blur(10px);
   background-color: rgba(0, 0, 0, 0.1);
   border: none;
   color: var(--foreground);
+  font-family: "Fira Code", "Source Code Pro", monospace;
+
+}
+.cm-tooltip .cm-completionInfo {
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .function .errors {

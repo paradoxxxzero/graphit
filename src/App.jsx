@@ -1,4 +1,5 @@
 import { autocompletion } from '@codemirror/autocomplete'
+import { tooltips } from '@codemirror/view'
 import { javascript } from '@codemirror/lang-javascript'
 import { tags as t } from '@lezer/highlight'
 import { createTheme } from '@uiw/codemirror-themes'
@@ -143,8 +144,6 @@ function urlMiddleware(reducer) {
   }
 }
 function plotCompletions(context) {
-  // const { state } = context
-  // const funs = state.languageDataAt('autocomplete', context.pos)
   let word = context.matchBefore(/\w*/)
   if (word.from === word.to && !context.explicit) return null
   return {
@@ -569,6 +568,7 @@ export function App() {
             extensions={[
               javascript({ jsx: true }),
               autocompletion({ override: [plotCompletions] }),
+              tooltips({ parent: document.body }),
             ]}
             onChange={handleFunctions}
           />
