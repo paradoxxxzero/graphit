@@ -75,6 +75,9 @@
 .cm-completionIcon.cm-completionIcon-math::after {
   content: "∮";
 }
+.cm-completionIcon.cm-completionIcon-util::after {
+  content: "⫟";
+}
 .cm-completionIcon.cm-completionIcon-graphit::after {
   content: "𝛛";
 }

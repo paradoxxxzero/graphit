@@ -44,7 +44,7 @@ export const Audio = ({
         ],
         [duration * sampleRate, duration * sampleRate],
         recordings,
-        { dimensions: 1, sampleRate }
+        { dimensions: 1, sampleRate, duration }
       )
 
       const sources = []

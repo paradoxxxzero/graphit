@@ -216,6 +216,7 @@ export function App() {
         {
           dimensions: 1,
           sampleRate: state.sampleRate,
+          duration: state.duration,
         }
       )
       const errors = data.map(d => d.err).filter(x => x)
@@ -228,7 +229,7 @@ export function App() {
       dispatch({ type: 'functions', functions })
       setErrors([])
     },
-    [recordings, state.sampleRate]
+    [recordings, state.duration, state.sampleRate]
   )
 
   useEffect(() => {
@@ -540,6 +541,7 @@ export function App() {
             lineWidth={state.lineWidth}
             onRegion={region => dispatch({ type: 'region', region })}
             sampleRate={state.sampleRate}
+            duration={state.duration}
             hide={displaySpectrogram}
             codeRef={codeRef}
           />
@@ -572,6 +574,7 @@ export function App() {
               foldGutter: false,
               lineNumbers: false,
               highlightActiveLine: false,
+              indentOnInput: false,
             }}
             theme={cmTheme}
             extensions={[

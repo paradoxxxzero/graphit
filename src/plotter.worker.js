@@ -9,6 +9,8 @@ const TYPE_VARIABLES = {
   polar: 'o',
   parametric: 't',
 }
+self.lerp = (a, b, x) => a + (b - a) * x
+self.clamp = (x, a, b) => Math.min(Math.max(x, a), b)
 
 // Globalize Math functions and constants
 for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
@@ -17,37 +19,53 @@ for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
 
 // Custom globlals:
 const PI = self.PI
-self.tau = self.TAU = PI * 2
+const TAU = (self.tau = self.TAU = PI * 2)
 self.eta = self.ETA = PI / 2
 
 self.ln = self.log
-self.osc = (x, freq, type = 'sine', e = 0.01) =>
-  x < 0
-    ? 0
-    : type === 'sine'
-    ? Math.sin(2 * Math.PI * freq * x)
-    : type === 'square'
-    ? Math.sign(Math.sin(2 * Math.PI * freq * x))
-    : type === 'smoothsquare'
-    ? Math.sin(2 * Math.PI * freq * x) /
-      Math.sqrt(Math.sin(2 * Math.PI * freq * x) ** 2 + e)
-    : type === 'sawtooth'
-    ? 2 * (x * freq - ~~(x * freq + 0.5))
-    : type === 'triangle'
-    ? 2 * Math.abs(2 * (x * freq + 0.25 - ~~(x * freq + 0.75))) - 1
-    : 0
 
-self.sine = (x, freq) => self.osc(x, freq, 'sine')
-self.square = (x, freq) => self.osc(x, freq, 'square')
-self.smoothsquare = (x, freq, e = 0.01) => self.osc(x, freq, 'smoothsquare', e)
-self.sawtooth = (x, freq) => self.osc(x, freq, 'sawtooth')
-self.triangle = (x, freq) => self.osc(x, freq, 'triangle')
+self.osc = (freq, type = 'sine', smooth = 0.5) => {
+  const k = ++self._state.call
+  if (!self._state[k]) {
+    self._state[k] = {
+      f: 0,
+    }
+  }
+  const state = self._state[k]
+  const dt = 1 / self._state.sampleRate
+  const f = (state.f += self.clamp(freq, 0, 22050) * dt)
 
-self.oscs = (freqs, x, type, e) => {
+  switch (type) {
+    case 'sine':
+      return Math.sin(f * TAU)
+    case 'square':
+      return Math.sign(Math.sin(f * TAU))
+    case 'smoothsquare':
+      return Math.tanh(Math.sin(f * TAU) / smooth)
+    case 'sawtooth':
+      return (f % 1) * 2 - 1
+    case 'triangle':
+      return Math.abs((f % 1) * 4 - 2) - 1
+    case 'noise':
+      return Math.random() * 2 - 1
+    default:
+      throw new Error(`Unknown oscillator type: ${type}`)
+  }
+}
+
+self.sine = freq => self.osc(freq, 'sine')
+self.square = freq => self.osc(freq, 'square')
+self.smoothsquare = (freq, smooth = 0.5) =>
+  self.osc(freq, 'smoothsquare', smooth)
+self.sawtooth = freq => self.osc(freq, 'sawtooth')
+self.triangle = freq => self.osc(freq, 'triangle')
+self.noise = () => self.osc(0, 'noise')
+
+self.oscs = (freqs, type, smooth = 0.5) => {
   let sum = 0
   freqs = Array.isArray(freqs) ? freqs : [freqs]
   for (let i = 0; i < freqs.length; i++) {
-    sum += self.osc(freqs[i], x, type, e)
+    sum += self.osc(freqs[i], type, smooth)
   }
   return sum / freqs.length
 }
@@ -58,9 +76,13 @@ self.adsr = (
   decay = 0.1,
   sustain = 0.4,
   release = 0.3,
-  sustainLevel = 0.5
-) =>
-  x < 0
+  sustainLevel = 0.5,
+  duration = null
+) => {
+  duration = duration || self._state.duration
+  x = x / duration
+
+  return x < 0
     ? 0
     : x <= attack
     ? x / attack // attack - linear increase to 1
@@ -72,11 +94,12 @@ self.adsr = (
     ? sustainLevel -
       ((sustainLevel - 0) * (x - attack - decay - sustain)) / release // release - linear decrease from s to 0
     : 0 // end - constant value of 0
+}
 
 // IIR filters:
 
 self.lowpass = (x, cutoff) => {
-  const k = `lowpass_${cutoff}`
+  const k = ++self._state.call
   if (!self._state[k]) {
     const rc = 1 / (2 * Math.PI * cutoff)
     const dt = 1 / self._state.sampleRate
@@ -87,7 +110,7 @@ self.lowpass = (x, cutoff) => {
 }
 
 self.highpass = (x, cutoff) => {
-  const k = `highpass_${cutoff}`
+  const k = ++self._state.call
   if (!self._state[k]) {
     const rc = 1 / (2 * Math.PI * cutoff)
     const dt = 1 / self._state.sampleRate
@@ -108,7 +131,6 @@ self.segment = (x, ...pairs) => {
 }
 
 self.at = (d, f, x) => f(x + d)
-
 self.__doc__ = Object.fromEntries(
   Object.entries(doc)
     .map(([type, docs]) =>
@@ -607,6 +629,7 @@ const sizePlot = (plotters, type, region, min, max, step) => {
 }
 
 const evalPoint = (plotters, type, n) => {
+  self._state.call = 0
   if (type === 'parametric') {
     const x = plotters[0](n)
     const y = plotters[1](n)
@@ -641,6 +664,7 @@ onmessage = ({
     recs,
     dimensions = 2,
     sampleRate,
+    duration,
     uuid,
   },
 }) => {
@@ -704,7 +728,7 @@ onmessage = ({
       })
     }
 
-    self._state = { sampleRate }
+    self._state = { sampleRate, duration, call: 0 }
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
@@ -712,6 +736,7 @@ onmessage = ({
       values = new Float32Array((max - min) / step)
       let i = 0
       for (let n = min; n < max; n += step) {
+        self._state.call = 0
         const val = plotters[0](n)
         if (typeof val !== 'number') {
           let e

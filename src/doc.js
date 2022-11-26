@@ -1,14 +1,15 @@
 export default {
   // Sound functions
   sound: {
-    adsr: 'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5)',
-    osc: 'osc usage: (freq, x, type = sine|square|smoothsquare|sawtooth|triangle, e = 0.01)',
-    oscs: 'oscs usage: (freqs, x, type = sine|square|smoothsquare|sawtooth|triangle, e = 0.01)',
-    sine: 'sine usage: (freq, x)',
-    square: 'square usage: (freq, x)',
-    smoothsquare: 'smoothsquare usage: (freq, x, e = 0.01)',
-    sawtooth: 'sawtooth usage: (freq, x)',
-    triangle: 'triangle usage: (freq, x)',
+    adsr: 'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5, duration = <sound duration>)',
+    osc: 'osc usage: (freq, type = sine|square|smoothsquare|sawtooth|triangle|noise, smooth = 0.5)',
+    oscs: 'oscs usage: (freqs, type = sine|square|smoothsquare|sawtooth|triangle|noise, smooth = 0.5)',
+    sine: 'sine usage: (freq)',
+    square: 'square usage: (freq)',
+    smoothsquare: 'smoothsquare usage: (freq, smooth = 0.5)',
+    sawtooth: 'sawtooth usage: (freq)',
+    triangle: 'triangle usage: (freq)',
+    noise: 'noise usage: ()',
     lowpass: 'lowpass usage: (x, cutoff)',
     highpass: 'highpass usage: (x, cutoff)',
     segment: 'segment usage: (x, ...pairs)',
@@ -65,6 +66,12 @@ export default {
     pi: "Ratio of a circle's circumference to its diameter; approximately 3.14159.",
     sqrt1_2: 'Square root of ½; approximately 0.707.',
     sqrt2: 'Square root of 2; approximately 1.414.',
+  },
+
+  // Utility functions
+  util: {
+    lerp: 'lerp usage: (x, y, a)',
+    clamp: 'clamp usage: (x, min, max)',
   },
 
   // Graphit syntax
