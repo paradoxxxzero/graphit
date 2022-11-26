@@ -24,6 +24,7 @@ export const Graphit = memo(
     hide,
     recordings,
     onRegion,
+    sampleRate,
     codeRef,
   }) {
     const canvasRef = useRef(null)
@@ -175,7 +176,8 @@ export const Graphit = memo(
         functions,
         region,
         [canvas.width, canvas.height],
-        recordings
+        recordings,
+        { sampleRate }
       )
       const errors = []
 
@@ -251,6 +253,7 @@ export const Graphit = memo(
       region,
       functions,
       recordings,
+      sampleRate,
       theme.background,
       theme.axis,
       theme.tick,

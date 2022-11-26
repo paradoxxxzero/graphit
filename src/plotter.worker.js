@@ -17,10 +17,11 @@ for (let key of Array.from(Object.getOwnPropertyNames(Math))) {
 
 // Custom globlals:
 const PI = self.PI
-const TAU = (self.tau = self.TAU = self.PI * 2)
-const ETA = (self.eta = self.ETA = self.PI / 2)
+self.tau = self.TAU = PI * 2
+self.eta = self.ETA = PI / 2
+
 self.ln = self.log
-self.osc = (freq, x, type = 'sine', e = 0.01) =>
+self.osc = (x, freq, type = 'sine', e = 0.01) =>
   x < 0
     ? 0
     : type === 'sine'
@@ -35,6 +36,12 @@ self.osc = (freq, x, type = 'sine', e = 0.01) =>
     : type === 'triangle'
     ? 2 * Math.abs(2 * (x * freq + 0.25 - ~~(x * freq + 0.75))) - 1
     : 0
+
+self.sine = (x, freq) => self.osc(x, freq, 'sine')
+self.square = (x, freq) => self.osc(x, freq, 'square')
+self.smoothsquare = (x, freq, e = 0.01) => self.osc(x, freq, 'smoothsquare', e)
+self.sawtooth = (x, freq) => self.osc(x, freq, 'sawtooth')
+self.triangle = (x, freq) => self.osc(x, freq, 'triangle')
 
 self.oscs = (freqs, x, type, e) => {
   let sum = 0
@@ -66,12 +73,34 @@ self.adsr = (
       ((sustainLevel - 0) * (x - attack - decay - sustain)) / release // release - linear decrease from s to 0
     : 0 // end - constant value of 0
 
-self.lowPass = (f, x, _, rc = 0.0005, sampleRate = 44100) =>
-  _ + (f(x) - _) / (rc * sampleRate + 1)
+// IIR filters:
 
-self.highPass = (f, x, _, rc = 0.0005, sampleRate = 44100) =>
-  (_ + f(x) - f(x - 1 / sampleRate)) * (rc / (rc + 1 / sampleRate))
+self.lowpass = (x, cutoff) => {
+  const k = `lowpass_${cutoff}`
+  if (!self._state[k]) {
+    const rc = 1 / (2 * Math.PI * cutoff)
+    const dt = 1 / self._state.sampleRate
+    self._state[k] = { alpha: dt / (rc + dt), last_y: 0 }
+  }
+  return (self._state[k].last_y =
+    self._state[k].last_y + self._state[k].alpha * (x - self._state[k].last_y))
+}
 
+self.highpass = (x, cutoff) => {
+  const k = `highpass_${cutoff}`
+  if (!self._state[k]) {
+    const rc = 1 / (2 * Math.PI * cutoff)
+    const dt = 1 / self._state.sampleRate
+    self._state[k] = { alpha: rc / (rc + dt), last_x: 0, last_y: 0 }
+  }
+
+  self._state[k].last_y =
+    self._state[k].alpha * (self._state[k].last_y + x - self._state[k].last_x)
+  self._state[k].last_x = x
+  return self._state[k].last_y
+}
+
+// Utils
 self.segment = (x, ...pairs) => {
   for (let i = 0; i < pairs.length; i += 2) {
     if (x < pairs[i]) return pairs[i + 1]
@@ -81,7 +110,14 @@ self.segment = (x, ...pairs) => {
 self.at = (d, f, x) => f(x + d)
 
 self.__doc__ = Object.fromEntries(
-  Object.entries(doc).map((k, v) => [self[k], v])
+  Object.entries(doc)
+    .map(([type, docs]) =>
+      Object.entries(docs).map(([name, ndoc]) => [
+        self[name],
+        `${type}: ${ndoc}`,
+      ])
+    )
+    .flat()
 )
 
 const auto = {
@@ -278,11 +314,8 @@ const adaptativePlot = (plotters, type, region, min, max, step) => {
   let points = []
   // const t0 = performance.now()
   // const lens = [points.length]
-  let x,
-    y,
-    m = 0
   for (let n = min; n < max; n += step) {
-    ;[x, y, m] = evalPoint(plotters, type, n, m)
+    const [x, y] = evalPoint(plotters, type, n)
     pushBounded(points, x, y, region, type)
   }
   points = increasePrecision(points, plotters, type, region, true)
@@ -308,10 +341,9 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   max += (len * auto.overflow) / 2
 
   const points = []
-  let m = 0
   let point = [NaN, NaN],
     last = [NaN, NaN],
-    next = evalPoint(plotters, type, min, m)
+    next = evalPoint(plotters, type, min)
   const [X, Y] = type === 'linear-horizontal' ? [1, 0] : [0, 1]
   const verticalRegion = region[type === 'linear-horizontal' ? 0 : 1]
   const horizontalRegion = region[type === 'linear-horizontal' ? 1 : 0]
@@ -329,8 +361,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     // Working for pixel n -> n + step
     last = point
     point = next
-    next = evalPoint(plotters, type, n + step, m)
-    m = next[2]
+    next = evalPoint(plotters, type, n + step)
 
     if (isNaN(point[Y]) || isNaN(next[Y])) {
       points.push(point[0], point[1])
@@ -369,8 +400,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     // Then let's look for extremums
     let left = point[X]
     let right = next[X]
-    let leftThird = evalPoint(plotters, type, left + (right - left) / 3, m)
-    let rightThird = evalPoint(plotters, type, right - (right - left) / 3, m)
+    let leftThird = evalPoint(plotters, type, left + (right - left) / 3)
+    let rightThird = evalPoint(plotters, type, right - (right - left) / 3)
 
     const leftGrowth = Math.sign(leftThird[Y] - point[Y])
     const centerGrowth = Math.sign(rightThird[Y] - leftThird[Y])
@@ -393,7 +424,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
             rightThird[Y] > verticalRegion[1])
         ) {
           // Asymptote?
-          const middle = evalPoint(plotters, type, (left + right) / 2, m)
+          const middle = evalPoint(plotters, type, (left + right) / 2)
           const leftMiddleGrowth = Math.sign(middle[Y] - leftThird[Y])
           const rightMiddleGrowth = Math.sign(rightThird[Y] - middle[Y])
 
@@ -467,8 +498,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
           }
           break
         }
-        leftThird = evalPoint(plotters, type, left + (right - left) / 3, m)
-        rightThird = evalPoint(plotters, type, right - (right - left) / 3, m)
+        leftThird = evalPoint(plotters, type, left + (right - left) / 3)
+        rightThird = evalPoint(plotters, type, right - (right - left) / 3)
       }
     } else {
       if (consecutive.max.length + consecutive.min.length > 0) {
@@ -485,8 +516,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
                   plotters,
                   type,
                   ((auto.subsampling - i) * point[X] + i * next[X]) /
-                    auto.subsampling,
-                  m
+                    auto.subsampling
                 )
           if (lastPoint) {
             const growth = Math.sign(currentPoint[Y] - lastPoint[Y])
@@ -569,31 +599,27 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
 const sizePlot = (plotters, type, region, min, max, step) => {
   const points = []
-  let x,
-    y,
-    m = 0
   for (let n = min; n < max; n += step) {
-    ;[x, y, m] = evalPoint(plotters, type, n, m)
+    const [x, y] = evalPoint(plotters, type, n)
     pushBounded(points, x, y, region, type)
   }
   return points
 }
 
-const evalPoint = (plotters, type, n, m) => {
+const evalPoint = (plotters, type, n) => {
   if (type === 'parametric') {
-    m = Array.isArray(m) ? m : [0, 0]
-    const x = plotters[0](n, m[0])
-    const y = plotters[1](n, m[1])
-    return [x, y, [x, y]]
+    const x = plotters[0](n)
+    const y = plotters[1](n)
+    return [x, y]
   } else if (type === 'polar') {
-    const r = plotters[0](n, m)
-    return [r * Math.cos(n), r * Math.sin(n), r]
+    const r = plotters[0](n)
+    return [r * Math.cos(n), r * Math.sin(n)]
   } else if (type === 'linear-horizontal') {
-    const x = plotters[0](n, m)
-    return [x, n, x]
+    const x = plotters[0](n)
+    return [x, n]
   } else if (type === 'linear') {
-    const y = plotters[0](n, m)
-    return [n, y, y]
+    const y = plotters[0](n)
+    return [n, y]
   }
   throw new Error(`Unknown plot type ${type}`)
 }
@@ -614,6 +640,7 @@ onmessage = ({
     rendering,
     recs,
     dimensions = 2,
+    sampleRate,
     uuid,
   },
 }) => {
@@ -644,7 +671,13 @@ onmessage = ({
       throw new Error(`Invalid step ${step}`)
     }
     if (!rendering) {
-      if (['linear', 'linear-horizontal'].includes(type)) {
+      if (
+        ['linear', 'linear-horizontal'].includes(type) &&
+        // For sound, size is still better
+        !Object.keys(doc.sound).some(x =>
+          funs[0].match(new RegExp(`\\b${x}\\b`))
+        )
+      ) {
         rendering = 'auto'
       } else {
         rendering = 'size'
@@ -671,17 +704,15 @@ onmessage = ({
       })
     }
 
+    self._state = { sampleRate }
     const plotters = funs.map(
-      fun => new Function(TYPE_VARIABLES[type], '_', 'return ' + fun)
+      fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-
     if (dimensions === 1) {
       values = new Float32Array((max - min) / step)
       let i = 0
-      let lastVal = 0
       for (let n = min; n < max; n += step) {
-        const val = plotters[0](n, lastVal)
-        lastVal = val
+        const val = plotters[0](n)
         if (typeof val !== 'number') {
           let e
           if (typeof val === 'function') {

@@ -144,15 +144,20 @@ function urlMiddleware(reducer) {
   }
 }
 function plotCompletions(context) {
-  let word = context.matchBefore(/\w*/)
+  let word = context.matchBefore(/[\w@]*/)
+  console.log('word', word)
   if (word.from === word.to && !context.explicit) return null
   return {
     from: word.from,
-    options: Object.entries(doc).map(([label, info]) => ({
-      label,
-      type: 'function',
-      info,
-    })),
+    options: Object.entries(doc)
+      .map(([type, docs]) =>
+        Object.entries(docs).map(([label, info]) => ({
+          label,
+          type,
+          info,
+        }))
+      )
+      .flat(),
   }
 }
 
@@ -210,6 +215,7 @@ export function App() {
         recordings,
         {
           dimensions: 1,
+          sampleRate: state.sampleRate,
         }
       )
       const errors = data.map(d => d.err).filter(x => x)
@@ -222,7 +228,7 @@ export function App() {
       dispatch({ type: 'functions', functions })
       setErrors([])
     },
-    [recordings]
+    [recordings, state.sampleRate]
   )
 
   useEffect(() => {
@@ -533,6 +539,7 @@ export function App() {
             recordings={recordings}
             lineWidth={state.lineWidth}
             onRegion={region => dispatch({ type: 'region', region })}
+            sampleRate={state.sampleRate}
             hide={displaySpectrogram}
             codeRef={codeRef}
           />
@@ -555,7 +562,9 @@ export function App() {
         )}
       </div>
       <div className={`function${errors.length ? ' error' : ''}`} ref={codeRef}>
-        <pre className="errors">{errors.map(e => e.message).join(', ')}</pre>
+        {errors.length > 0 ? (
+          <pre className="errors">{errors.map(e => e.message).join(', ')}</pre>
+        ) : null}
         <div className="functionsText">
           <CodeMirror
             value={functionsText}
