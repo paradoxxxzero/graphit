@@ -24,15 +24,20 @@ self.eta = self.ETA = PI / 2
 
 self.ln = self.log
 
-self.osc = (freq, type = 'sine', smooth = 0.5) => {
+self.osc = (x, freq, type = 'sine', smooth = 0.5) => {
   const k = ++self._state.call
+  if (self._state.n < 0) {
+    return 0
+  }
   if (!self._state[k]) {
     self._state[k] = {
       f: 0,
+      last_x: 0,
     }
   }
   const state = self._state[k]
-  const dt = 1 / self._state.sampleRate
+  const dt = x - state.last_x // 1 / self._state.sampleRate
+  state.last_x = x
   const f = (state.f += self.clamp(freq, 0, 22050) * dt)
 
   switch (type) {
@@ -53,19 +58,19 @@ self.osc = (freq, type = 'sine', smooth = 0.5) => {
   }
 }
 
-self.sine = freq => self.osc(freq, 'sine')
-self.square = freq => self.osc(freq, 'square')
-self.smoothsquare = (freq, smooth = 0.5) =>
-  self.osc(freq, 'smoothsquare', smooth)
-self.sawtooth = freq => self.osc(freq, 'sawtooth')
-self.triangle = freq => self.osc(freq, 'triangle')
+self.sine = (x, freq) => self.osc(x, freq, 'sine')
+self.square = (x, freq) => self.osc(x, freq, 'square')
+self.smoothsquare = (x, freq, smooth = 0.5) =>
+  self.osc(x, freq, 'smoothsquare', smooth)
+self.sawtooth = (x, freq) => self.osc(x, freq, 'sawtooth')
+self.triangle = (x, freq) => self.osc(x, freq, 'triangle')
 self.noise = () => self.osc(0, 'noise')
 
-self.oscs = (freqs, type, smooth = 0.5) => {
+self.oscs = (x, freqs, type, smooth = 0.5) => {
   let sum = 0
   freqs = Array.isArray(freqs) ? freqs : [freqs]
   for (let i = 0; i < freqs.length; i++) {
-    sum += self.osc(freqs[i], type, smooth)
+    sum += self.osc(x, freqs[i], type, smooth)
   }
   return sum / freqs.length
 }
@@ -98,29 +103,57 @@ self.adsr = (
 
 // IIR filters:
 
-self.lowpass = (x, cutoff) => {
+self.lowpass = (x, input, cutoff) => {
   const k = ++self._state.call
-  if (!self._state[k]) {
-    const rc = 1 / (2 * Math.PI * cutoff)
-    const dt = 1 / self._state.sampleRate
-    self._state[k] = { alpha: dt / (rc + dt), last_y: 0 }
+  const rc = 1 / (2 * Math.PI * cutoff)
+
+  if (self._state.n < 0) {
+    return 0
   }
-  return (self._state[k].last_y =
-    self._state[k].last_y + self._state[k].alpha * (x - self._state[k].last_y))
+
+  if (!self._state[k]) {
+    const dt = self._state.n
+
+    self._state[k] = {
+      last_value: input * (dt / (rc + dt)),
+      last_x: 0,
+    }
+    return self._state[k].last_value
+  }
+
+  const state = self._state[k]
+  const dt = x - state.last_x
+  state.last_x = x
+  const alpha = dt / (rc + dt)
+
+  return (state.last_value =
+    state.last_value + alpha * (input - state.last_value))
 }
 
-self.highpass = (x, cutoff) => {
+self.highpass = (x, input, cutoff) => {
   const k = ++self._state.call
-  if (!self._state[k]) {
-    const rc = 1 / (2 * Math.PI * cutoff)
-    const dt = 1 / self._state.sampleRate
-    self._state[k] = { alpha: rc / (rc + dt), last_x: 0, last_y: 0 }
+  const rc = 1 / (2 * Math.PI * cutoff)
+
+  if (self._state.n < 0) {
+    return 0
   }
 
-  self._state[k].last_y =
-    self._state[k].alpha * (self._state[k].last_y + x - self._state[k].last_x)
-  self._state[k].last_x = x
-  return self._state[k].last_y
+  if (!self._state[k]) {
+    self._state[k] = {
+      last_value: input,
+      last_input: input,
+      last_x: 0,
+    }
+    return self._state[k].last_value
+  }
+  const state = self._state[k]
+  const dt = x - state.last_x
+  state.last_x = x
+  const alpha = rc / (rc + dt)
+
+  state.last_value = alpha * (state.last_value + input - state.last_input)
+  state.last_input = input
+  return state.last_value
 }
 
 // Utils
@@ -623,13 +656,14 @@ const sizePlot = (plotters, type, region, min, max, step) => {
   const points = []
   for (let n = min; n < max; n += step) {
     const [x, y] = evalPoint(plotters, type, n)
-    pushBounded(points, x, y, region, type)
+    points.push(x, y)
   }
   return points
 }
 
 const evalPoint = (plotters, type, n) => {
   self._state.call = 0
+  self._state.n = n
   if (type === 'parametric') {
     const x = plotters[0](n)
     const y = plotters[1](n)
@@ -728,7 +762,7 @@ onmessage = ({
       })
     }
 
-    self._state = { sampleRate, duration, call: 0 }
+    self._state = { sampleRate, duration, call: 0, min, max, step }
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
@@ -737,6 +771,7 @@ onmessage = ({
       let i = 0
       for (let n = min; n < max; n += step) {
         self._state.call = 0
+        self._state.n = n
         const val = plotters[0](n)
         if (typeof val !== 'number') {
           let e
