@@ -15,7 +15,7 @@ const parseColor = hexColor => {
   return [r, g, b]
 }
 
-export const Spectrogram = ({ data, theme }) => {
+export const Spectrogram = ({ data, theme, sampleRate }) => {
   const canvasRef = useRef(null)
 
   useLayoutEffect(() => {
@@ -32,6 +32,13 @@ export const Spectrogram = ({ data, theme }) => {
     ))
     ctx.fillStyle = theme.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = theme.tick
+    const fftSize = height * 2
+    console.log(fftSize)
+    const jToHz = sampleRate / fftSize
+    for (let j = 0; j < height; j += 50) {
+      ctx.fillText(`${(j * jToHz).toFixed(0)}Hz`, 10, j)
+    }
 
     const light =
       parseColor(theme.background).reduce((a, b) => a + b) / 3 > 128
@@ -68,7 +75,7 @@ export const Spectrogram = ({ data, theme }) => {
 
       for (let i = 0; i < thisWidth; i++) {
         for (let j = 0; j < thisHeight; j++) {
-          const k = (i + (thisHeight - j) * width) * 4
+          const k = (i + j * width) * 4
           const value = spectrogram[i][j]
           imageData.data[k] -= r * value
           imageData.data[k + 1] -= g * value
@@ -78,7 +85,7 @@ export const Spectrogram = ({ data, theme }) => {
       }
       ctx.putImageData(imageData, 0, 0)
     }
-  }, [data, theme])
+  }, [data, sampleRate, theme])
 
   return <canvas ref={canvasRef} className="spectrogram" />
 }

@@ -560,7 +560,11 @@ export function App() {
           setSpectrograms={setSpectrograms}
         />
         {displaySpectrogram && (
-          <Spectrogram data={spectrograms} theme={theme} />
+          <Spectrogram
+            data={spectrograms}
+            theme={theme}
+            sampleRate={state.sampleRate}
+          />
         )}
       </div>
       <div className={`function${errors.length ? ' error' : ''}`} ref={codeRef}>
