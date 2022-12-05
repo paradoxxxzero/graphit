@@ -102,59 +102,145 @@ self.adsr = (
 }
 
 // IIR filters:
-
-self.lowpass = (x, input, cutoff) => {
+self.iirFilterGen = genParams => (input, cutoff, bandwidth) => {
   const k = ++self._state.call
-  const rc = 1 / (2 * Math.PI * cutoff)
-
   if (self._state.n < 0) {
     return 0
   }
 
   if (!self._state[k]) {
-    const dt = self._state.n
-
+    const [a, b] = genParams(cutoff, bandwidth)
     self._state[k] = {
-      last_value: input * (dt / (rc + dt)),
-      last_x: 0,
+      a,
+      b,
+      x: new Array(a.length).fill(0),
+      y: new Array(b.length).fill(0),
     }
-    return self._state[k].last_value
   }
 
   const state = self._state[k]
-  const dt = x - state.last_x
-  state.last_x = x
-  const alpha = dt / (rc + dt)
-
-  return (state.last_value =
-    state.last_value + alpha * (input - state.last_value))
-}
-
-self.highpass = (x, input, cutoff) => {
-  const k = ++self._state.call
-  const rc = 1 / (2 * Math.PI * cutoff)
-
-  if (self._state.n < 0) {
-    return 0
+  const { a, b, x, y } = state
+  let output = 0
+  for (let i = 0; i < a.length; i++) {
+    output += a[i] * x[i]
+  }
+  for (let i = 0; i < b.length; i++) {
+    output += b[i] * y[i]
+  }
+  for (let i = a.length - 1; i > 0; i--) {
+    x[i] = x[i - 1]
+  }
+  for (let i = b.length - 1; i > 0; i--) {
+    y[i] = y[i - 1]
   }
 
-  if (!self._state[k]) {
-    self._state[k] = {
-      last_value: input,
-      last_input: input,
-      last_x: 0,
-    }
-    return self._state[k].last_value
-  }
-  const state = self._state[k]
-  const dt = x - state.last_x
-  state.last_x = x
-  const alpha = rc / (rc + dt)
-
-  state.last_value = alpha * (state.last_value + input - state.last_input)
-  state.last_input = input
-  return state.last_value
+  x[0] = input
+  y[0] = output
+  return output
 }
+
+self.lowpass = self.iirFilterGen(cutoff => {
+  const fc = cutoff * self._state.step
+  const p = Math.exp(-TAU * fc)
+  return [[1 - p], [p]]
+})
+
+self.lowpass4 = self.iirFilterGen(cutoff => {
+  const T = 14.445
+  const fc = cutoff * self._state.step
+  const p = Math.exp(-T * fc)
+  return [
+    [Math.pow(1 - p, 4)],
+    [4 * p, -6 * Math.pow(p, 2), 4 * Math.pow(p, 3), -Math.pow(p, 4)],
+  ]
+})
+
+self.highpass = self.iirFilterGen(cutoff => {
+  const fc = cutoff * self._state.step
+  const p = Math.exp(-TAU * fc)
+  return [[(1 + p) / 2, -(1 + p) / 2], [p]]
+})
+
+self.bandpass = self.iirFilterGen((cutoff, bandwidth) => {
+  const fc = cutoff * self._state.step
+  const bw = bandwidth * self._state.step
+  const c = 2 * Math.cos(TAU * fc)
+
+  const R = 1 - 3 * bw
+  const K = (1 - R * c + R * R) / (2 - c)
+
+  return [
+    [1 - K, (K - R) * c, R * R - K],
+    [R * c, -R * R],
+  ]
+})
+
+self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
+  const fc = cutoff * self._state.step
+  const bw = bandwidth * self._state.step
+  const c = 2 * Math.cos(TAU * fc)
+
+  const R = 1 - 3 * bw
+  const K = (1 - R * c + R * R) / (2 - c)
+
+  return [
+    [K, -K * c, K],
+    [R * c, -R * R],
+  ]
+})
+
+// self.lowpass = (x, input, cutoff) => {
+//   const k = ++self._state.call
+//   const rc = 1 / (2 * Math.PI * cutoff)
+
+//   if (self._state.n < 0) {
+//     return 0
+//   }
+
+//   if (!self._state[k]) {
+//     const dt = self._state.n
+
+//     self._state[k] = {
+//       last_value: input * (dt / (rc + dt)),
+//       last_x: x,
+//     }
+//     return self._state[k].last_value
+//   }
+
+//   const state = self._state[k]
+//   const dt = x - state.last_x
+//   state.last_x = 0
+//   const alpha = dt / (rc + dt)
+
+//   return (state.last_value =
+//     state.last_value + alpha * (input - state.last_value))
+// }
+
+// self.highpass = (x, input, cutoff) => {
+//   const k = ++self._state.call
+//   const rc = 1 / (2 * Math.PI * cutoff)
+
+//   if (self._state.n < 0) {
+//     return 0
+//   }
+
+//   if (!self._state[k]) {
+//     self._state[k] = {
+//       last_value: input,
+//       last_input: input,
+//       last_x: 0,
+//     }
+//     return self._state[k].last_value
+//   }
+//   const state = self._state[k]
+//   const dt = x - state.last_x
+//   state.last_x = x
+//   const alpha = rc / (rc + dt)
+
+//   state.last_value = alpha * (state.last_value + input - state.last_input)
+//   state.last_input = input
+//   return state.last_value
+// }
 
 // Utils
 self.segment = (x, ...pairs) => {
