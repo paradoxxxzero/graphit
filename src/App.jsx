@@ -78,11 +78,20 @@ function reducer(state, action) {
       }
 
     case 'resetRegion':
-      if (action.duration) {
+      if (action.fft) {
         return {
           ...state,
           region: [
-            [0, action.duration],
+            [0, 22000],
+            [0, 1],
+          ],
+        }
+      }
+      if (action.audio) {
+        return {
+          ...state,
+          region: [
+            [0, action.audio],
             [-1, 1],
           ],
         }
@@ -154,6 +163,7 @@ function plotCompletions(context) {
 export function App() {
   const [errors, setErrors] = useState([])
   const [audio, setAudio] = useState(0)
+  const [fft, setFft] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
   const [functionsText, setFunctionsText] = useState('')
@@ -177,10 +187,11 @@ export function App() {
       dispatch({
         type: 'resetRegion',
         ratio,
-        duration: newAudio !== null ? newAudio : audio,
+        fft,
+        audio,
       })
     },
-    [audio]
+    [audio, fft]
   )
 
   const size = useCallback(() => {
@@ -225,13 +236,8 @@ export function App() {
       }
 
       if (data.some(({ type }) => type === 'sound')) {
-        setAudio(audio => {
-          const newState = Math.max(...data.map(({ max }) => max))
-          if (audio !== newState) {
-            handleResetRegion(newState)
-          }
-          return newState
-        })
+        setAudio(Math.max(...data.map(({ max }) => max)))
+        setFft(data.some(({ rendering }) => rendering === 'fft'))
       } else {
         setAudio(() => {
           handleResetRegion(false)
@@ -246,6 +252,10 @@ export function App() {
     },
     [handleResetRegion, recordings, state.functions]
   )
+
+  useEffect(() => {
+    handleResetRegion()
+  }, [audio, fft])
 
   useEffect(() => {
     if (functionsText !== state.functions) {

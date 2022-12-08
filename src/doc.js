@@ -79,6 +79,7 @@ export default {
     '@size': 'Plot each pixel',
     '@adaptative': 'Adaptative plot',
     '@auto': 'Better adaptative plot',
+    '@fft': 'FFT of the sound',
     '@!': 'Precision',
     '@/dot': 'Dot plot mode',
     '@/point': 'Point plot mode',

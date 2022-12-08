@@ -9,6 +9,7 @@ const TYPE_VARIABLES = {
   polar: 'o',
   parametric: 't',
   sound: 't',
+  fft: 't',
 }
 self.lerp = (a, b, x) => a + (b - a) * x
 self.clamp = (x, a, b) => Math.min(Math.max(x, a), b)
@@ -65,7 +66,7 @@ self.smoothsquare = (x, freq, smooth = 0.5) =>
   self.osc(x, freq, 'smoothsquare', smooth)
 self.sawtooth = (x, freq) => self.osc(x, freq, 'sawtooth')
 self.triangle = (x, freq) => self.osc(x, freq, 'triangle')
-self.noise = () => self.osc(0, 'noise')
+self.noise = () => self.osc(0, 0, 'noise')
 
 self.oscs = (x, freqs, type, smooth = 0.5) => {
   let sum = 0
@@ -254,6 +255,57 @@ self.pulse = () => {
     return 1
   }
   return 0
+}
+
+self.fft = (real, imag) => {
+  const n = real.length
+  if (n !== imag.length) {
+    throw new Error('Mismatched lengths')
+  }
+  const levels = Math.log2(n)
+  if (levels !== ~~levels) {
+    throw new Error('Length is not a power of 2')
+  }
+
+  const cosTable = new Float32Array(n / 2)
+  const sinTable = new Float32Array(n / 2)
+  for (var i = 0; i < n / 2; i++) {
+    cosTable[i] = Math.cos((TAU * i) / n)
+    sinTable[i] = Math.sin((TAU * i) / n)
+  }
+
+  // Bit-reversed addressing permutation
+  for (let i = 0; i < n; i++) {
+    let j = 0
+    let l = i
+    for (let k = 0; k < levels; k++) {
+      j = (j << 1) | (l & 1)
+      l >>>= 1
+    }
+    if (j > i) {
+      ;[real[i], real[j]] = [real[j], real[i]]
+      ;[imag[i], imag[j]] = [imag[j], imag[i]]
+    }
+  }
+
+  // Cooley-Tukey decimation-in-time radix-2 FFT
+  for (let size = 2; size <= n; size *= 2) {
+    const halfsize = size / 2
+    const tablestep = n / size
+    for (let i = 0; i < n; i += size) {
+      for (let j = i, k = 0; j < i + halfsize; j++, k += tablestep) {
+        const tpre =
+          real[j + halfsize] * cosTable[k] + imag[j + halfsize] * sinTable[k]
+        const tpim =
+          -real[j + halfsize] * sinTable[k] + imag[j + halfsize] * cosTable[k]
+        real[j + halfsize] = real[j] - tpre
+        imag[j + halfsize] = imag[j] - tpim
+        real[j] += tpre
+        imag[j] += tpim
+      }
+    }
+  }
+  return [real, imag]
 }
 
 // Utils
@@ -761,6 +813,29 @@ const sizePlot = (plotters, type, region, min, max, step) => {
   return points
 }
 
+const fftPlot = (plotters, type, region, min, max, step) => {
+  const points = []
+  const real = []
+  const imag = []
+
+  for (let n = min; n < 2 * max; n += step) {
+    const [_, y] = evalPoint(plotters, type, n)
+    real.push(y)
+    imag.push(0)
+  }
+
+  self.fft(real, imag)
+
+  const fd = 2 / real.length
+  const bw = fd / (2 * step)
+
+  for (let i = 0; i < real.length / 2; i++) {
+    points[i * 2] = bw * i + bw / 2
+    points[i * 2 + 1] = fd * Math.sqrt(real[i] ** 2 + imag[i] ** 2)
+  }
+  return points
+}
+
 const evalPoint = (plotters, type, n) => {
   self._state.call = 0
   self._state.n = n
@@ -774,7 +849,7 @@ const evalPoint = (plotters, type, n) => {
   } else if (type === 'linear-horizontal') {
     const x = plotters[0](n)
     return [x, n]
-  } else if (type === 'linear' || type === 'sound') {
+  } else if (['linear', 'sound', 'fft'].includes(type)) {
     const y = plotters[0](n)
     return [n, y]
   }
@@ -821,6 +896,10 @@ onmessage = ({
     }
     if (typeof samples === 'string') {
       samples = new Function('return ' + samples)()
+    }
+    if (rendering === 'fft') {
+      samples =
+        samples & (samples - 1) ? 2 ** (~~Math.log2(samples) + 1) : samples
     }
     const step = (max - min) / samples
     if (isNaN(step) || step === 0) {
@@ -890,7 +969,10 @@ onmessage = ({
         points = adaptativePlot(plotters, type, region, min, max, step)
       } else if (rendering === 'auto') {
         points = autoPlot(plotters, type, region, min, max, step)
+      } else if (rendering === 'fft') {
+        points = fftPlot(plotters, type, region, min, max, step)
       }
+
       values = new Float32Array(points)
     }
 
@@ -909,7 +991,7 @@ onmessage = ({
   }
 
   postMessage(
-    { index, values, type, mode, max, samples, err, uuid },
+    { index, values, type, mode, max, samples, rendering, err, uuid },
     values?.buffer
   )
 }

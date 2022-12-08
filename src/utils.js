@@ -49,7 +49,7 @@ export function getFunctionParams(fun, region, precisions) {
     fun = match[1] + (match[3] || '')
     samples = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@\s*(auto|size|adaptative)\s*(@.+|$)/))) {
+  if ((match = fun.match(/(.+)@\s*(auto|size|adaptative|fft)\s*(@.+|$)/))) {
     fun = match[1] + (match[3] || '')
     rendering = match[2].trim()
   }
@@ -85,22 +85,26 @@ export function getFunctionParams(fun, region, precisions) {
     ))
   ) {
     type = 'sound'
-    const duration = match[1] ? parseFloat(match[1]) : 1
+    let duration = match[1] ? parseFloat(match[1]) : 1
     if (isNaN(duration) || duration <= 0) {
-      throw new Error('Invalid sound duration: ' + match[1])
+      console.warn('Invalid sound duration: ' + match[1])
+      duration = 1
     }
-    const sampleRate = match[2] ? ~~match[2] : DEFAULT_SAMPLE_RATE
+    let sampleRate = match[2] ? ~~match[2] : DEFAULT_SAMPLE_RATE
     if (sampleRate < 3000 || sampleRate > 768000) {
-      throw new Error(
+      console.warn(
         'Invalid sample rate: ' + match[2] + ' must be in range [3000, 768000])'
       )
+      sampleRate = DEFAULT_SAMPLE_RATE
     }
     min = 0
     max = duration
     // max = region ? clamp(region[0][1], 0, duration) : duration
-    samples = duration * sampleRate
+    samples = samples || duration * sampleRate
     funs = [match[3].trim()]
-    samples = precisions ? clamp(precisions[0], 0, samples) : samples
+    samples = precisions //&& rendering !== 'fft'
+      ? clamp(precisions[0], 0, samples)
+      : samples
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'
     funs = [match[1].trim()]
