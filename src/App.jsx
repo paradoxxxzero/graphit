@@ -21,12 +21,11 @@ import { Graphit } from './Graphit'
 import { plotFunctions } from './plotter'
 import { Spectrogram } from './Spectrogram'
 import themes from './themes'
+import { DEFAULT_SAMPLE_RATE } from './base'
 
 const initialState = {
   theme: 'tango',
-  duration: 1,
   lineWidth: 1.5,
-  sampleRate: 44100,
   volume: 0.5,
   region: null,
   loop: false,
@@ -56,16 +55,6 @@ function reducer(state, action) {
         return state
       }
       return { ...state, volume: parseFloat(action.volume) }
-    case 'duration':
-      if (!action.duration) {
-        return state
-      }
-      return { ...state, duration: parseFloat(action.duration) }
-    case 'sampleRate':
-      if (!action.sampleRate) {
-        return state
-      }
-      return { ...state, sampleRate: parseInt(action.sampleRate) }
     case 'region':
       const region = action.region.map(minmax => minmax.map(parseFloat))
       if (
@@ -87,15 +76,17 @@ function reducer(state, action) {
       } else {
         return state
       }
-    case 'audioRegion':
-      return {
-        ...state,
-        region: [
-          [0, state.duration],
-          [-1, 1],
-        ],
-      }
+
     case 'resetRegion':
+      if (action.duration) {
+        return {
+          ...state,
+          region: [
+            [0, action.duration],
+            [-1, 1],
+          ],
+        }
+      }
       return {
         ...state,
         region: [
@@ -145,7 +136,6 @@ function urlMiddleware(reducer) {
 }
 function plotCompletions(context) {
   let word = context.matchBefore(/[\w@]*/)
-  console.log('word', word)
   if (word.from === word.to && !context.explicit) return null
   return {
     from: word.from,
@@ -163,9 +153,10 @@ function plotCompletions(context) {
 
 export function App() {
   const [errors, setErrors] = useState([])
+  const [audio, setAudio] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
-  const [functionsText, setFunctionsText] = useState(state.functions)
+  const [functionsText, setFunctionsText] = useState('')
   const [playAudio, setPlayAudio] = useState(null)
   const [recordAudio, setRecordAudio] = useState(null)
   const [spectrograms, setSpectrograms] = useState([])
@@ -177,12 +168,20 @@ export function App() {
   const wrapperRef = useRef()
   const codeRef = useRef()
 
-  const handleResetRegion = useCallback(() => {
-    const wrapper = wrapperRef.current
-    const { width, height } = wrapper.getBoundingClientRect()
-    const ratio = height / width
-    dispatch({ type: 'resetRegion', ratio })
-  }, [])
+  const handleResetRegion = useCallback(
+    (newAudio = null) => {
+      const wrapper = wrapperRef.current
+      const { width, height } = wrapper.getBoundingClientRect()
+      const ratio = height / width
+
+      dispatch({
+        type: 'resetRegion',
+        ratio,
+        duration: newAudio !== null ? newAudio : audio,
+      })
+    },
+    [audio]
+  )
 
   const size = useCallback(() => {
     if (!state.region) {
@@ -215,26 +214,42 @@ export function App() {
         recordings,
         {
           dimensions: 1,
-          sampleRate: state.sampleRate,
-          duration: state.duration,
         }
       )
       const errors = data.map(d => d.err).filter(x => x)
       if (errors.length) {
         console.warn(...errors)
         setErrors(errors)
+        setAudio(false)
         return
       }
 
-      dispatch({ type: 'functions', functions })
-      setErrors([])
+      if (data.some(({ type }) => type === 'sound')) {
+        setAudio(audio => {
+          const newState = Math.max(...data.map(({ max }) => max))
+          if (audio !== newState) {
+            handleResetRegion(newState)
+          }
+          return newState
+        })
+      } else {
+        setAudio(() => {
+          handleResetRegion(false)
+          return false
+        })
+      }
+
+      if (functions !== state.functions) {
+        dispatch({ type: 'functions', functions })
+        setErrors([])
+      }
     },
-    [recordings, state.duration, state.sampleRate]
+    [handleResetRegion, recordings, state.functions]
   )
 
   useEffect(() => {
     if (functionsText !== state.functions) {
-      setFunctionsText(state.functions)
+      handleFunctions(state.functions)
     }
     // Run only when state.functions changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,7 +314,6 @@ export function App() {
 
   const handleSetPlayAudio = useCallback(playAudio => {
     setPlayAudio(() => async () => {
-      dispatch({ type: 'audioRegion' })
       const url = await playAudio()
       setSaveUrl(url)
     })
@@ -331,21 +345,21 @@ export function App() {
         const stopRecording = await recordAudio(microphone)
         setRecording(() => () => stopRecording())
       } else {
-        const data = await recording()
-        const recDuration = data.length / state.sampleRate
-        if (recDuration > state.duration) {
-          dispatch({ type: 'duration', duration: recDuration })
-        }
-        const n = recordings.length + 1
-        setRecordings([
-          ...recordings,
-          { buffer: data, sampleRate: state.sampleRate },
-        ])
+        const { sampleRate, data } = await recording()
         setRecording(null)
-        if (!functionsText.includes(`$rec${n}(`)) {
+        if (data.length) {
+          const recDuration = data.length / sampleRate
+
+          const n = recordings.length + 1
+          setRecordings([
+            ...recordings,
+            { buffer: data, sampleRate: sampleRate },
+          ])
           const newFunctionsText = `${functionsText.trim()}${
             functionsText.trim() && ' ; '
-          }y = $rec${n}(x)`
+          }s(${recDuration.toFixed(6).replace(/\.?0*$/, '')}${
+            sampleRate !== DEFAULT_SAMPLE_RATE ? `, ${sampleRate}` : ''
+          }) = $rec${n}(t)`
           if (functionsText === state.functions || functionsText === '') {
             dispatch({ type: 'functions', functions: newFunctionsText })
           }
@@ -359,9 +373,7 @@ export function App() {
     recordAudio,
     recording,
     recordings,
-    state.duration,
     state.functions,
-    state.sampleRate,
   ])
 
   useLayoutEffect(() => {
@@ -378,6 +390,20 @@ export function App() {
   return (
     <div className="App" style={themeVars}>
       <div className="controls">
+        <button className="button" onClick={toggleSettings}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            preserveAspectRatio="xMidYMid meet"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="m9.25 22l-.4-3.2q-.325-.125-.612-.3q-.288-.175-.563-.375L4.7 19.375l-2.75-4.75l2.575-1.95Q4.5 12.5 4.5 12.337v-.675q0-.162.025-.337L1.95 9.375l2.75-4.75l2.975 1.25q.275-.2.575-.375q.3-.175.6-.3l.4-3.2h5.5l.4 3.2q.325.125.613.3q.287.175.562.375l2.975-1.25l2.75 4.75l-2.575 1.95q.025.175.025.337v.675q0 .163-.05.338l2.575 1.95l-2.75 4.75l-2.95-1.25q-.275.2-.575.375q-.3.175-.6.3l-.4 3.2Zm2.8-6.5q1.45 0 2.475-1.025Q15.55 13.45 15.55 12q0-1.45-1.025-2.475Q13.5 8.5 12.05 8.5q-1.475 0-2.488 1.025Q8.55 10.55 8.55 12q0 1.45 1.012 2.475Q10.575 15.5 12.05 15.5Z"
+            />
+          </svg>
+        </button>
         <button
           className="button"
           onClick={() => dispatch({ type: 'nextTheme' })}
@@ -395,7 +421,7 @@ export function App() {
             />
           </svg>
         </button>
-        <button className="button" onClick={handleResetRegion}>
+        <button className="button" onClick={() => handleResetRegion()}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
@@ -413,7 +439,7 @@ export function App() {
             />
           </svg>
         </button>
-        {playAudio ? (
+        {audio && playAudio ? (
           <button className="button" onClick={playAudio}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -429,7 +455,7 @@ export function App() {
             </svg>
           </button>
         ) : null}
-        {recordAudio ? (
+        {audio && recordAudio ? (
           <button className="button" onClick={handleMicClick}>
             {microphone ? (
               recording ? (
@@ -516,20 +542,6 @@ export function App() {
             </svg>
           </a>
         ) : null}
-        <button className="button" onClick={toggleSettings}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="1em"
-            height="1em"
-            preserveAspectRatio="xMidYMid meet"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="m9.25 22l-.4-3.2q-.325-.125-.612-.3q-.288-.175-.563-.375L4.7 19.375l-2.75-4.75l2.575-1.95Q4.5 12.5 4.5 12.337v-.675q0-.162.025-.337L1.95 9.375l2.75-4.75l2.975 1.25q.275-.2.575-.375q.3-.175.6-.3l.4-3.2h5.5l.4 3.2q.325.125.613.3q.287.175.562.375l2.975-1.25l2.75 4.75l-2.575 1.95q.025.175.025.337v.675q0 .163-.05.338l2.575 1.95l-2.75 4.75l-2.95-1.25q-.275.2-.575.375q-.3.175-.6.3l-.4 3.2Zm2.8-6.5q1.45 0 2.475-1.025Q15.55 13.45 15.55 12q0-1.45-1.025-2.475Q13.5 8.5 12.05 8.5q-1.475 0-2.488 1.025Q8.55 10.55 8.55 12q0 1.45 1.012 2.475Q10.575 15.5 12.05 15.5Z"
-            />
-          </svg>
-        </button>
       </div>
       <div className="wrapper" ref={wrapperRef}>
         {state.region ? (
@@ -540,31 +552,24 @@ export function App() {
             recordings={recordings}
             lineWidth={state.lineWidth}
             onRegion={region => dispatch({ type: 'region', region })}
-            sampleRate={state.sampleRate}
-            duration={state.duration}
             hide={displaySpectrogram}
             codeRef={codeRef}
           />
         ) : null}
-        <Audio
-          functions={state.functions}
-          theme={theme}
-          duration={state.duration}
-          sampleRate={state.sampleRate}
-          volume={state.volume}
-          loop={state.loop}
-          recordings={recordings}
-          setAudioRegion={() => dispatch({ type: 'audioRegion' })}
-          setPlayAudio={handleSetPlayAudio}
-          setRecordAudio={handleSetRecordAudio}
-          setSpectrograms={setSpectrograms}
-        />
-        {displaySpectrogram && (
-          <Spectrogram
-            data={spectrograms}
+        {audio ? (
+          <Audio
+            functions={state.functions}
             theme={theme}
-            sampleRate={state.sampleRate}
+            volume={state.volume}
+            loop={state.loop}
+            recordings={recordings}
+            setPlayAudio={handleSetPlayAudio}
+            setRecordAudio={handleSetRecordAudio}
+            setSpectrograms={setSpectrograms}
           />
+        ) : null}
+        {displaySpectrogram && (
+          <Spectrogram data={spectrograms} theme={theme} />
         )}
       </div>
       <div className={`function${errors.length ? ' error' : ''}`} ref={codeRef}>
@@ -660,32 +665,7 @@ export function App() {
               </div>
               <h2>Audio</h2>
               <div className="form-group">
-                <label htmlFor="duration">Duration</label>
-                <input
-                  type="number"
-                  name="duration"
-                  min={0}
-                  step={0.1}
-                  value={state.duration}
-                  onChange={e =>
-                    dispatch({ type: 'duration', duration: e.target.value })
-                  }
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="sampleRate">Sample Rate</label>
-                <input
-                  type="number"
-                  name="sampleRate"
-                  min={1000}
-                  value={state.sampleRate}
-                  onChange={e =>
-                    dispatch({ type: 'sampleRate', sampleRate: e.target.value })
-                  }
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="volume">Volume</label>
+                <label htmlFor="volume">Master Volume</label>
                 <input
                   type="number"
                   name="volume"

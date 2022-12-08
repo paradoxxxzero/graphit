@@ -1,3 +1,4 @@
+import { DEFAULT_SAMPLE_RATE } from './base'
 export function lerp(v0, v1, t) {
   return (1 - t) * v0 + t * v1
 }
@@ -78,6 +79,28 @@ export function getFunctionParams(fun, region, precisions) {
       ;[, [min, max]] = region
     }
     samples = samples || precisions[1]
+  } else if (
+    (match = fun.match(
+      /^\s*s(?:\(\s*(\S+)\s*(?:\s*,\s*(\s*\d+\s*)\s*)?\s*\))?\s*=(.+)$/
+    ))
+  ) {
+    type = 'sound'
+    const duration = match[1] ? parseFloat(match[1]) : 1
+    if (isNaN(duration) || duration <= 0) {
+      throw new Error('Invalid sound duration: ' + match[1])
+    }
+    const sampleRate = match[2] ? ~~match[2] : DEFAULT_SAMPLE_RATE
+    if (sampleRate < 3000 || sampleRate > 768000) {
+      throw new Error(
+        'Invalid sample rate: ' + match[2] + ' must be in range [3000, 768000])'
+      )
+    }
+    min = 0
+    max = duration
+    // max = region ? clamp(region[0][1], 0, duration) : duration
+    samples = duration * sampleRate
+    funs = [match[3].trim()]
+    samples = precisions ? clamp(precisions[0], 0, samples) : samples
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'
     funs = [match[1].trim()]

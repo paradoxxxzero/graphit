@@ -8,6 +8,7 @@ const TYPE_VARIABLES = {
   'linear-horizontal': 'y',
   polar: 'o',
   parametric: 't',
+  sound: 't',
 }
 self.lerp = (a, b, x) => a + (b - a) * x
 self.clamp = (x, a, b) => Math.min(Math.max(x, a), b)
@@ -84,7 +85,7 @@ self.adsr = (
   sustainLevel = 0.5,
   duration = null
 ) => {
-  duration = duration || self._state.duration
+  duration = duration || self._state.max
   x = x / duration
 
   return x < 0
@@ -241,6 +242,19 @@ self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
 //   state.last_input = input
 //   return state.last_value
 // }
+
+self.pulse = () => {
+  const k = ++self._state.call
+  if (self._state.n < 0) {
+    return 0
+  }
+  const state = self._state[k]
+  if (!state) {
+    self._state[k] = true
+    return 1
+  }
+  return 0
+}
 
 // Utils
 self.segment = (x, ...pairs) => {
@@ -760,7 +774,7 @@ const evalPoint = (plotters, type, n) => {
   } else if (type === 'linear-horizontal') {
     const x = plotters[0](n)
     return [x, n]
-  } else if (type === 'linear') {
+  } else if (type === 'linear' || type === 'sound') {
     const y = plotters[0](n)
     return [n, y]
   }
@@ -783,8 +797,6 @@ onmessage = ({
     rendering,
     recs,
     dimensions = 2,
-    sampleRate,
-    duration,
     uuid,
   },
 }) => {
@@ -815,13 +827,7 @@ onmessage = ({
       throw new Error(`Invalid step ${step}`)
     }
     if (!rendering) {
-      if (
-        ['linear', 'linear-horizontal'].includes(type) &&
-        // For sound, size is still better
-        !Object.keys(doc.sound).some(x =>
-          funs[0].match(new RegExp(`\\b${x}\\b`))
-        )
-      ) {
+      if (['linear', 'linear-horizontal'].includes(type)) {
         rendering = 'auto'
       } else {
         rendering = 'size'
@@ -848,7 +854,12 @@ onmessage = ({
       })
     }
 
-    self._state = { sampleRate, duration, call: 0, min, max, step }
+    self._state = {
+      call: 0,
+      min,
+      max,
+      step,
+    }
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
@@ -897,5 +908,8 @@ onmessage = ({
     err = e
   }
 
-  postMessage({ index, values, type, mode, err, uuid }, values?.buffer)
+  postMessage(
+    { index, values, type, mode, max, samples, err, uuid },
+    values?.buffer
+  )
 }

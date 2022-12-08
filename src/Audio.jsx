@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { plotFunctions } from './plotter'
+import { DEFAULT_SAMPLE_RATE } from './base'
 import recordProcessor from './recording.worklet?url'
 
 export const Audio = ({
   functions,
-  duration,
-  sampleRate,
   volume,
   loop,
   recordings,
@@ -17,7 +16,7 @@ export const Audio = ({
   const [masterGain, setMasterGain] = useState(null)
 
   const createContext = useCallback(() => {
-    const audioContext = new AudioContext()
+    const audioContext = new AudioContext({ sampleRate: DEFAULT_SAMPLE_RATE })
     const masterGain = audioContext.createGain()
     masterGain.connect(audioContext.destination)
     setAudioContext(audioContext)
@@ -33,29 +32,22 @@ export const Audio = ({
       if (!audioContext) {
         ;({ audioContext: ctx, masterGain: master } = createContext())
       }
-      const count = duration * sampleRate
 
       const errors = []
-      const data = await plotFunctions(
-        functions,
-        [
-          [0, duration],
-          [0, duration],
-        ],
-        [duration * sampleRate, duration * sampleRate],
-        recordings,
-        { dimensions: 1, sampleRate, duration }
-      )
+      const data = await plotFunctions(functions, null, null, recordings, {
+        dimensions: 1,
+      })
 
       const sources = []
       for (let i = 0; i < data.length; i++) {
         if (!data[i]) continue
-        const { index, values, err } = data[i]
+        const { index, values, max: duration, samples, err } = data[i]
         if (err) {
           errors.push(err)
           continue
         }
-        const buffer = ctx.createBuffer(1, count, sampleRate)
+        const sampleRate = samples / duration
+        const buffer = ctx.createBuffer(1, samples, sampleRate)
         buffer.copyToChannel(values, 0)
 
         const gain = ctx.createGain()
@@ -101,7 +93,7 @@ export const Audio = ({
               gain.disconnect(master)
               analyser.disconnect(gain)
               source.disconnect(analyser)
-              resolve({ index, spectrogram })
+              resolve({ index, spectrogram, sampleRate })
             })(index, spectrogram, interval)
           })
         )
@@ -158,9 +150,9 @@ export const Audio = ({
         /* channel count */
         view.setUint16(22, numChannels, true)
         /* sample rate */
-        view.setUint32(24, sampleRate, true)
+        view.setUint32(24, ctx.sampleRate, true)
         /* byte rate (sample rate * block align) */
-        view.setUint32(28, sampleRate * 4, true)
+        view.setUint32(28, ctx.sampleRate * 4, true)
         /* block align (channel count * bytes per sample) */
         view.setUint16(32, numChannels * 2, true)
         /* bits per sample */
@@ -180,12 +172,10 @@ export const Audio = ({
     [
       audioContext,
       createContext,
-      duration,
       functions,
       loop,
       masterGain,
       recordings,
-      sampleRate,
       setSpectrograms,
     ]
   )
@@ -197,7 +187,7 @@ export const Audio = ({
       if (!audioContext) {
         ;({ audioContext: ctx } = createContext())
       }
-
+      const sampleRate = stream.getAudioTracks()[0].getSettings().sampleRate
       const input = ctx.createMediaStreamSource(stream)
 
       await ctx.audioWorklet.addModule(recordProcessor)
@@ -241,12 +231,12 @@ export const Audio = ({
         }
         chunks = chunks.slice(start, end)
         const size = chunks.reduce((a, b) => a + b.length, 0)
-        const buffer = new Float32Array(size)
+        const data = new Float32Array(size)
         let s = 0
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i]
           for (let j = 0; j < chunk.length; j++) {
-            buffer[s + j] = chunk[j]
+            data[s + j] = chunk[j]
           }
           s += chunk.length
         }
@@ -258,7 +248,7 @@ export const Audio = ({
         stream.getAudioTracks().forEach(track => {
           track.stop()
         })
-        return buffer
+        return { sampleRate, data }
       }
     },
     [audioContext, createContext]
