@@ -22,6 +22,9 @@ import { plotFunctions } from './plotter'
 import { Spectrogram } from './Spectrogram'
 import themes from './themes'
 import { DEFAULT_SAMPLE_RATE } from './base'
+import { regionEquals } from './utils'
+
+const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
 
 const initialState = {
   theme: 'tango',
@@ -33,7 +36,38 @@ const initialState = {
     'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) \nr = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1000 \nk = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! 1000',
 }
 
-const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
+const initialType = {
+  theme: 'string',
+  lineWidth: 'float',
+  volume: 'float',
+  region: 'region',
+  loop: 'bool',
+  functions: 'string',
+}
+
+const formatKey = (key, value) => {
+  switch (initialType[key]) {
+    case 'float':
+      return parseFloat(value)
+    case 'bool':
+      return value === 'true'
+    case 'region':
+      return value.map(minmax => minmax.map(parseFloat))
+    default:
+      return value
+  }
+}
+
+const getInitialState = () => {
+  if (window.location.search) {
+    const parsed = qs.parse(window.location.search, qsOptions)
+    return Object.keys(initialState).reduce((acc, key) => {
+      acc[key] = parsed[key] ? formatKey(key, parsed[key]) : initialState[key]
+      return acc
+    }, {})
+  }
+  return initialState
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -49,21 +83,15 @@ function reducer(state, action) {
       if (!action.lineWidth) {
         return state
       }
-      return { ...state, lineWidth: parseFloat(action.lineWidth) }
+      return { ...state, lineWidth: formatKey('lineWidth', action.lineWidth) }
     case 'volume':
       if (!action.volume) {
         return state
       }
-      return { ...state, volume: parseFloat(action.volume) }
+      return { ...state, volume: formatKey('volume', action.volume) }
     case 'region':
-      const region = action.region.map(minmax => minmax.map(parseFloat))
-      if (
-        !state.region ||
-        region[0][0] !== state.region[0][1] ||
-        region[0][1] !== state.region[0][1] ||
-        region[1][0] !== state.region[1][0] ||
-        region[1][1] !== state.region[1][1]
-      ) {
+      const region = formatKey('region', action.region)
+      if (!regionEquals(region, state.region)) {
         if (
           region[0][1] <= region[0][0] ||
           region[1][1] <= region[1][0] ||
@@ -77,36 +105,10 @@ function reducer(state, action) {
         return state
       }
 
-    case 'resetRegion':
-      if (action.fft) {
-        return {
-          ...state,
-          region: [
-            [0, 22000],
-            [0, 1],
-          ],
-        }
-      }
-      if (action.audio) {
-        return {
-          ...state,
-          region: [
-            [0, action.audio],
-            [-1, 1],
-          ],
-        }
-      }
-      return {
-        ...state,
-        region: [
-          [-2, 2],
-          [-2 * action.ratio, 2 * action.ratio],
-        ],
-      }
     case 'loop':
-      return { ...state, loop: action.loop && action.loop !== 'false' }
+      return { ...state, loop: action.loop }
     default:
-      throw new Error()
+      throw new Error("Unknown action type: '" + action.type + "'")
   }
 }
 function debounce(func, timeout = 300) {
@@ -162,10 +164,13 @@ function plotCompletions(context) {
 
 export function App() {
   const [errors, setErrors] = useState([])
-  const [audio, setAudio] = useState(0)
-  const [fft, setFft] = useState(false)
+  const [audio, setAudio] = useState(null)
+  const [currentPreferredRegion, setCurrentPreferredRegion] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [state, dispatch] = useReducer(urlMiddleware(reducer), initialState)
+  const [state, dispatch] = useReducer(
+    urlMiddleware(reducer),
+    getInitialState()
+  )
   const [functionsText, setFunctionsText] = useState('')
   const [playAudio, setPlayAudio] = useState(null)
   const [recordAudio, setRecordAudio] = useState(null)
@@ -178,55 +183,21 @@ export function App() {
   const wrapperRef = useRef()
   const codeRef = useRef()
 
-  const handleResetRegion = useCallback(
-    (newAudio = null) => {
-      const wrapper = wrapperRef.current
-      const { width, height } = wrapper.getBoundingClientRect()
-      const ratio = height / width
+  const handleRegion = useCallback(region => {
+    dispatch({ type: 'region', region })
+  }, [])
 
-      dispatch({
-        type: 'resetRegion',
-        ratio,
-        fft,
-        audio,
-      })
-    },
-    [audio, fft]
-  )
-
-  const size = useCallback(() => {
-    if (!state.region) {
-      handleResetRegion()
-    }
-  }, [handleResetRegion, state.region])
-
-  useEffect(() => {
-    window.addEventListener('resize', size)
-    return () => window.removeEventListener('resize', size)
-  }, [size])
-
-  useLayoutEffect(() => {
-    if (state.region === null) {
-      size()
-    }
-  }, [state.region, size])
+  const handleResetRegion = useCallback(() => {
+    dispatch({ type: 'region', region: currentPreferredRegion })
+  }, [currentPreferredRegion])
 
   const handleFunctions = useCallback(
     async functions => {
       setFunctionsText(functions)
 
-      const data = await plotFunctions(
-        functions,
-        [
-          [0, 1],
-          [0, 1],
-        ],
-        [1, 1],
-        recordings,
-        {
-          dimensions: 1,
-        }
-      )
+      const data = await plotFunctions(functions, state.region, recordings, {
+        check: true,
+      })
       const errors = data.map(d => d.err).filter(x => x)
       if (errors.length) {
         console.warn(...errors)
@@ -234,36 +205,54 @@ export function App() {
         setAudio(false)
         return
       }
-
-      if (data.some(({ type }) => type === 'sound')) {
-        setAudio(Math.max(...data.map(({ max }) => max)))
-        setFft(data.some(({ rendering }) => rendering === 'fft'))
-      } else {
-        setAudio(() => {
-          handleResetRegion(false)
-          return false
-        })
+      const preferredRegion = data.reduce((acc, { preferredRegion }) => {
+        if (preferredRegion) {
+          if (acc) {
+            return [
+              [
+                Math.min(acc[0][0], preferredRegion[0][0]),
+                Math.max(acc[0][1], preferredRegion[0][1]),
+                Math.max(acc[0][2], preferredRegion[0][2]),
+              ],
+              [
+                Math.min(acc[0][0], preferredRegion[0][0]),
+                Math.max(acc[0][1], preferredRegion[0][1]),
+                Math.max(acc[0][2], preferredRegion[0][2]),
+              ],
+            ]
+          } else {
+            return preferredRegion
+          }
+        }
+        return acc
+      }, null)
+      if (
+        preferredRegion &&
+        (!currentPreferredRegion ||
+          !regionEquals(currentPreferredRegion, preferredRegion))
+      ) {
+        setCurrentPreferredRegion(preferredRegion)
+        if (currentPreferredRegion) {
+          dispatch({ type: 'region', region: preferredRegion })
+        }
       }
 
+      setAudio(data.some(({ type }) => type === 'sound'))
       if (functions !== state.functions) {
         dispatch({ type: 'functions', functions })
         setErrors([])
       }
     },
-    [handleResetRegion, recordings, state.functions]
+    [currentPreferredRegion, recordings, state.functions, state.region]
   )
 
   useEffect(() => {
-    handleResetRegion()
-  }, [audio, fft])
-
-  useEffect(() => {
-    if (functionsText !== state.functions) {
+    if (state.region && functionsText !== state.functions) {
       handleFunctions(state.functions)
     }
     // Run only when state.functions changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.functions])
+  }, [state.functions, state.region])
 
   const theme = themes[state.theme]
 
@@ -392,7 +381,6 @@ export function App() {
       Object.keys(queryString).length &&
         dispatch({ type: 'all', ...queryString })
     }
-    popstate()
     window.addEventListener('popstate', popstate)
     return () => window.removeEventListener('popstate', popstate)
   }, [])
@@ -431,7 +419,7 @@ export function App() {
             />
           </svg>
         </button>
-        <button className="button" onClick={() => handleResetRegion()}>
+        <button className="button" onClick={handleResetRegion}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
@@ -554,18 +542,16 @@ export function App() {
         ) : null}
       </div>
       <div className="wrapper" ref={wrapperRef}>
-        {state.region ? (
-          <Graphit
-            functions={state.functions}
-            theme={theme}
-            region={state.region}
-            recordings={recordings}
-            lineWidth={state.lineWidth}
-            onRegion={region => dispatch({ type: 'region', region })}
-            hide={displaySpectrogram}
-            codeRef={codeRef}
-          />
-        ) : null}
+        <Graphit
+          functions={state.functions}
+          theme={theme}
+          region={state.region}
+          recordings={recordings}
+          lineWidth={state.lineWidth}
+          onRegion={handleRegion}
+          hide={displaySpectrogram}
+          codeRef={codeRef}
+        />
         {audio ? (
           <Audio
             functions={state.functions}

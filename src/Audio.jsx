@@ -34,8 +34,8 @@ export const Audio = ({
       }
 
       const errors = []
-      const data = await plotFunctions(functions, null, null, recordings, {
-        dimensions: 1,
+      const data = await plotFunctions(functions, null, recordings, {
+        audio: true,
       })
 
       const sources = []

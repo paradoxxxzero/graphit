@@ -11,6 +11,20 @@ export async function timeout(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+export const regionEquals = (region1, region2) => {
+  if (!region1 || !region2) {
+    return region1 === region2
+  }
+  return (
+    region1[0][0] === region2[0][0] &&
+    region1[0][1] === region2[0][1] &&
+    region1[0][2] === region2[0][2] &&
+    region1[1][0] === region2[1][0] &&
+    region1[1][1] === region2[1][1] &&
+    region1[1][2] === region2[1][2]
+  )
+}
+
 export function orderRange(min, max, proj, minTick) {
   const range = max - min
   const order = ~~Math.log10(range)
@@ -31,7 +45,10 @@ export function orderRange(min, max, proj, minTick) {
   }
 }
 
-export function getFunctionParams(fun, region, precisions) {
+export const nextPowerOf2 = n =>
+  n & (n - 1) ? 2 ** ((Math.log2(n) + 1) | 0) : n
+
+export function getFunctionParams(fun, region) {
   let match,
     type,
     funs,
@@ -69,16 +86,16 @@ export function getFunctionParams(fun, region, precisions) {
     type = 'linear'
     funs = [match[1].trim()]
     if (min === null) {
-      ;[[min, max]] = region
+      ;[[min, max]] = region || [[]]
     }
-    samples = samples || precisions[0]
+    samples = samples || (region ? region[0][2] : 0)
   } else if ((match = fun.match(/^\s*x\s*=(.+)$/))) {
     type = 'linear-horizontal'
     funs = [match[1].trim()]
     if (min === null) {
-      ;[, [min, max]] = region
+      ;[, [min, max]] = region || [null, []]
     }
-    samples = samples || precisions[1]
+    samples = samples || (region ? region[1][2] : 0)
   } else if (
     (match = fun.match(
       /^\s*s(?:\(\s*(\S+)\s*(?:\s*,\s*(\s*\d+\s*)\s*)?\s*\))?\s*=(.+)$/
@@ -99,26 +116,22 @@ export function getFunctionParams(fun, region, precisions) {
     }
     min = 0
     max = duration
-    // max = region ? clamp(region[0][1], 0, duration) : duration
     samples = samples || duration * sampleRate
     funs = [match[3].trim()]
-    samples = precisions //&& rendering !== 'fft'
-      ? clamp(precisions[0], 0, samples)
-      : samples
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'
     funs = [match[1].trim()]
     if (min === null) {
       ;[min, max] = [0, 2 * Math.PI]
     }
-    samples = samples || Math.min(...precisions)
+    samples = samples || region ? Math.min(region[0][2], region[1][2]) : 0
   } else if ((match = fun.match(/^\s*{\s*x\s*=(.+),\s*y\s*=(.+)}\s*$/))) {
     type = 'parametric'
     funs = [match[1].trim(), match[2].trim()]
     if (min === null) {
       ;[min, max] = [0, 1]
     }
-    samples = samples || Math.min(...precisions)
+    samples = samples || region ? Math.min(region[0][2], region[1][2]) : 0
   } else if ((match = fun.match(/^\s*(\S+)\s*=(.+)$/))) {
     type = 'affect'
     funs = [match[1].trim(), match[2].trim()]

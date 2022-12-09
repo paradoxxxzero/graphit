@@ -9,7 +9,7 @@ import {
 } from 'react'
 import './Graphit.css'
 import { plotFunctions } from './plotter'
-import { clamp, lerp, orderRange } from './utils'
+import { clamp, lerp, orderRange, regionEquals } from './utils'
 
 const TICK_SIZE = 10
 const MIN_TICK = 200
@@ -102,6 +102,9 @@ export const Graphit = memo(
     )
 
     const plot = useCallback(async () => {
+      if (!region) {
+        return
+      }
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
       const dpr = window.devicePixelRatio || 1
@@ -171,12 +174,7 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      const data = await plotFunctions(
-        functions,
-        region,
-        [canvas.width, canvas.height],
-        recordings
-      )
+      const data = await plotFunctions(functions, region, recordings)
       const errors = []
 
       redraw()
@@ -268,30 +266,43 @@ export const Graphit = memo(
       const canvas = canvasRef.current
       const dpr = window.devicePixelRatio || 1
 
-      const oldWidth = canvas.width
-      const oldHeight = canvas.height
+      let oldWidth = canvas.width
+      let oldHeight = canvas.height
 
       canvas.width = window.innerWidth * dpr
       canvas.height = window.innerHeight * dpr
 
       // Don't resize region if it was the initial one
       if (oldWidth === 300 && oldHeight === 150) {
-        return
+        if (region) {
+          return
+        } else {
+          oldWidth = canvas.width
+          oldHeight = canvas.height
+        }
       }
 
       const [[xmin, xmax], [ymin, ymax]] = region
+        ? region
+        : [
+            [-2, 2],
+            [
+              (-2 * canvas.height) / canvas.width,
+              (2 * canvas.height) / canvas.width,
+            ],
+          ]
       const dx = (xmax - xmin) * (canvas.width / oldWidth - 1)
       const dy = (ymax - ymin) * (canvas.height / oldHeight - 1)
 
       onRegion([
-        [xmin - dx / 2, xmax + dx / 2],
-        [ymin - dy / 2, ymax + dy / 2],
+        [xmin - dx / 2, xmax + dx / 2, canvas.width],
+        [ymin - dy / 2, ymax + dy / 2, canvas.height],
       ])
     }, [onRegion, region])
 
     useEffect(() => {
-      window.addEventListener('resize', size)
-      return () => window.removeEventListener('resize', size)
+      window.addEventListener('resize', size, { passive: true })
+      return () => window.removeEventListener('resize', size, { passive: true })
     }, [size])
 
     useLayoutEffect(() => {
@@ -309,19 +320,21 @@ export const Graphit = memo(
           if (pinching) {
             cancel()
           }
-          const [[xmin, xmax], [ymin, ymax]] = first ? region : memo
+          const [[xmin, xmax, xsamples], [ymin, ymax, ysamples]] = first
+            ? region
+            : memo
 
           const dx = di2dx(i * window.devicePixelRatio)
           const dy = dj2dy(-j * window.devicePixelRatio)
 
           onRegion([
-            [xmin - dx, xmax - dx],
-            [ymin - dy, ymax - dy],
+            [xmin - dx, xmax - dx, xsamples],
+            [ymin - dy, ymax - dy, ysamples],
           ])
           return first
             ? [
-                [xmin, xmax],
-                [ymin, ymax],
+                [xmin, xmax, xsamples],
+                [ymin, ymax, ysamples],
               ]
             : memo
         },
@@ -333,8 +346,14 @@ export const Graphit = memo(
           }
           const dpr = window.devicePixelRatio || 1
           const canvas = canvasRef.current
-          const [[xmin, xmax], [ymin, ymax], [i, j], a, orientation, oscale] =
-            first ? [...region, origin, da[1], null, null] : memo
+          const [
+            [xmin, xmax, xsamples],
+            [ymin, ymax, ysamples],
+            [i, j],
+            a,
+            orientation,
+            oscale,
+          ] = first ? [...region, origin, da[1], null, null] : memo
           let xscale, yscale
           if (!orientation) {
             xscale = yscale = scale
@@ -348,16 +367,23 @@ export const Graphit = memo(
           const yShiftMin = lerp(0, yShift, 1 - (dpr * j) / canvas.height)
 
           onRegion([
-            [xmin - xShiftMin, xmax + (xShift - xShiftMin)],
-            [ymin - yShiftMin, ymax + (yShift - yShiftMin)],
+            [xmin - xShiftMin, xmax + (xShift - xShiftMin), xsamples],
+            [ymin - yShiftMin, ymax + (yShift - yShiftMin), ysamples],
           ])
 
           return first
-            ? [[xmin, xmax], [ymin, ymax], origin, a, orientation, oscale]
+            ? [
+                [xmin, xmax, xsamples],
+                [ymin, ymax, ysamples],
+                origin,
+                a,
+                orientation,
+                oscale,
+              ]
             : memo
         },
         onWheel: ({ delta: [, dj], event, altKey, shiftKey }) => {
-          const [[xmin, xmax], [ymin, ymax]] = region
+          const [[xmin, xmax, xsamples], [ymin, ymax, ysamples]] = region
           const { clientX: i, clientY: j } = event
           const canvas = canvasRef.current
           const dy = altKey ? 0 : dj2dy(-dj)
@@ -365,8 +391,8 @@ export const Graphit = memo(
           const dxmin = lerp(0, dx, i / canvas.width)
           const dymin = lerp(0, dy, j / canvas.height)
           onRegion([
-            [xmin + dxmin, xmax - (dx - dxmin)],
-            [ymin + (dy - dymin), ymax - dymin],
+            [xmin + dxmin, xmax - (dx - dxmin), xsamples],
+            [ymin + (dy - dymin), ymax - dymin, ysamples],
           ])
         },
         onMove: ({ xy: [i, j], dragging }) => {
@@ -377,6 +403,7 @@ export const Graphit = memo(
       },
       {
         target: canvasRef,
+        enabled: region,
       }
     )
 
@@ -390,15 +417,11 @@ export const Graphit = memo(
     )
   },
   (prev, next) => {
-    return (
-      prev.fun === next.fun &&
-      prev.theme === next.theme &&
-      prev.onRegion === next.onRegion &&
-      prev.onError === next.onError &&
-      prev.region[0][0] === next.region[0][0] &&
-      prev.region[0][1] === next.region[0][1] &&
-      prev.region[1][0] === next.region[1][0] &&
-      prev.region[1][1] === next.region[1][1]
-    )
+    for (let key in next) {
+      if (key !== 'region' && prev[key] !== next[key]) {
+        return false
+      }
+    }
+    return regionEquals(prev.region, next.region)
   }
 )

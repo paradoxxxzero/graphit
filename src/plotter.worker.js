@@ -1,6 +1,7 @@
 /* eslint-disable no-new-func */
 
 import doc from './doc'
+import { nextPowerOf2 } from './utils'
 
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -814,24 +815,28 @@ const sizePlot = (plotters, type, region, min, max, step) => {
 }
 
 const fftPlot = (plotters, type, region, min, max, step) => {
+  const samples = nextPowerOf2((max - min) / (max * step))
   const points = []
   const real = []
   const imag = []
-
-  for (let n = min; n < 2 * max; n += step) {
-    const [_, y] = evalPoint(plotters, type, n)
+  for (let n = 0; n < samples; n++) {
+    const [_, y] = evalPoint(plotters, type, n * step)
     real.push(y)
     imag.push(0)
   }
 
   self.fft(real, imag)
+  const fMax = 2 / samples
+  const bw = fMax / (2 * step)
 
-  const fd = 2 / real.length
-  const bw = fd / (2 * step)
-
-  for (let i = 0; i < real.length / 2; i++) {
-    points[i * 2] = bw * i + bw / 2
-    points[i * 2 + 1] = fd * Math.sqrt(real[i] ** 2 + imag[i] ** 2)
+  const downsampling = Math.max(1, ~~(samples / region[0][2]))
+  for (let i = 0; i < samples / 2; i++) {
+    let i0 = i,
+      a = 0
+    for (; i - i0 < downsampling; i++) {
+      a = Math.max(a, fMax * Math.sqrt(real[i] ** 2 + imag[i] ** 2))
+    }
+    points.push((bw * (i0 + i + 1)) / 2, a)
   }
   return points
 }
@@ -871,12 +876,14 @@ onmessage = ({
     mode,
     rendering,
     recs,
-    dimensions = 2,
+    check,
+    audio,
     uuid,
   },
 }) => {
   let err = '',
     points = [],
+    preferredRegion,
     values
 
   try {
@@ -897,10 +904,7 @@ onmessage = ({
     if (typeof samples === 'string') {
       samples = new Function('return ' + samples)()
     }
-    if (rendering === 'fft') {
-      samples =
-        samples & (samples - 1) ? 2 ** (~~Math.log2(samples) + 1) : samples
-    }
+
     const step = (max - min) / samples
     if (isNaN(step) || step === 0) {
       throw new Error(`Invalid step ${step}`)
@@ -942,27 +946,54 @@ onmessage = ({
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    if (dimensions === 1) {
+    if (check) {
+      self._state.call = self._state.n = 0
+      const val = plotters[0](Math.random() * (max - min) + min)
+      if (typeof val !== 'number') {
+        let e
+        if (typeof val === 'function') {
+          e = new Error(self.__doc__[val] || 'Function not supported')
+        } else if (typeof val === 'undefined') {
+          e = new Error(`${funs[0]} is undefined`)
+        } else {
+          e = new Error(`${typeof val} is not a number`)
+        }
+        throw e
+      }
+      if (type === 'sound') {
+        if (rendering === 'fft') {
+          const duration = max
+          const sampleRate = samples / duration
+          preferredRegion = [
+            [0, sampleRate / 2, region[0][2]],
+            [0, 1, region[1][2]],
+          ]
+        } else {
+          preferredRegion = [
+            [0, max, region[0][2]],
+            [-1, 1, region[1][2]],
+          ]
+        }
+      } else {
+        // TODO: Implement region hinting for normal plots
+        preferredRegion = [
+          [-2, 2, region[0][2]],
+          [
+            (-2 * region[1][2]) / region[0][2],
+            (2 * region[1][2]) / region[0][2],
+            region[1][2],
+          ],
+        ]
+      }
+    } else if (audio) {
       values = new Float32Array((max - min) / step)
       let i = 0
       for (let n = min; n < max; n += step) {
         self._state.call = 0
         self._state.n = n
-        const val = plotters[0](n)
-        if (typeof val !== 'number') {
-          let e
-          if (typeof val === 'function') {
-            e = new Error(self.__doc__[val] || 'Function not supported')
-          } else if (typeof val === 'undefined') {
-            e = new Error(`${funs[0]} is undefined`)
-          } else {
-            e = new Error(`${typeof val} is not a number`)
-          }
-          throw e
-        }
-        values[i++] = val
+        values[i++] = plotters[0](n)
       }
-    } else if (dimensions === 2) {
+    } else {
       if (rendering === 'size') {
         points = sizePlot(plotters, type, region, min, max, step)
       } else if (rendering === 'adaptative') {
@@ -991,7 +1022,18 @@ onmessage = ({
   }
 
   postMessage(
-    { index, values, type, mode, max, samples, rendering, err, uuid },
+    {
+      index,
+      values,
+      type,
+      mode,
+      max,
+      samples,
+      rendering,
+      preferredRegion,
+      err,
+      uuid,
+    },
     values?.buffer
   )
 }

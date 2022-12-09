@@ -30,7 +30,6 @@ const sendToPlotter = async (index, message, transfer) => {
 export const plotFunctions = async (
   functions,
   region,
-  precisions,
   recordings,
   options = {}
 ) => {
@@ -39,14 +38,14 @@ export const plotFunctions = async (
     .map(fun => fun.trim())
     .filter(x => x)
   const affects = []
-  const functionsTypeValues = []
+  let functionsTypeValues = []
   // Filter plot functions and affects
   for (let i = 0; i < functionsText.length; i++) {
     let recs
     let { type, funs, recIndexes, ...params } = getFunctionParams(
       functionsText[i],
       region,
-      precisions
+      options
     )
     if (recIndexes) {
       recs = {}
@@ -65,7 +64,11 @@ export const plotFunctions = async (
     }
     functionsTypeValues[i].index = i
   }
-
+  if (options.audio) {
+    functionsTypeValues = functionsTypeValues.filter(({ type }) =>
+      ['sound', 'affect'].includes(type)
+    )
+  }
   // Plot functions
   const data = await Promise.all(
     functionsTypeValues.map(({ index, ...params }) =>
