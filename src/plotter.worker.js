@@ -866,18 +866,17 @@ const affected = {}
 onmessage = ({
   data: {
     index,
+    region,
+    affects,
     funs,
     type,
     min,
     max,
     samples,
-    region,
-    affects,
     mode,
     rendering,
     recs,
-    check,
-    audio,
+    job,
     uuid,
   },
 }) => {
@@ -885,7 +884,6 @@ onmessage = ({
     points = [],
     preferredRegion,
     values
-
   try {
     if (type === 'unknown') {
       throw new Error(`Invalid function type ${funs.join(', ')}`)
@@ -946,7 +944,7 @@ onmessage = ({
     const plotters = funs.map(
       fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
     )
-    if (check) {
+    if (job === 'check') {
       self._state.call = self._state.n = 0
       const val = plotters[0](Math.random() * (max - min) + min)
       if (typeof val !== 'number') {
@@ -985,7 +983,7 @@ onmessage = ({
           ],
         ]
       }
-    } else if (audio) {
+    } else if (job === 'sound') {
       values = new Float32Array((max - min) / step)
       let i = 0
       for (let n = min; n < max; n += step) {

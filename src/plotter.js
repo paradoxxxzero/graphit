@@ -1,8 +1,9 @@
 import Plotter from './plotter.worker.js?worker'
-import { getFunctionParams } from './utils'
+import { getFunctionParams, timeout } from './utils'
 
-const workers = []
+const workersType = {}
 
+const promisesType = {}
 const uuid4 = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0
@@ -10,29 +11,66 @@ const uuid4 = () => {
     return v.toString(16)
   })
 }
-
-const sendToPlotter = async (index, message, transfer) => {
-  const plotter = workers[index]
+const sendToPlotter = async (index, message, type) => {
+  if (!promisesType[type]) {
+    promisesType[type] = {}
+  }
+  if (!workersType[type]) {
+    workersType[type] = {}
+  }
   const uuid = uuid4()
 
-  plotter.postMessage({ ...message, uuid }, transfer)
-  return await new Promise(resolve => {
-    const filterMessage = ({ data }) => {
-      if (data.uuid === uuid) {
-        resolve(data)
-        plotter.removeEventListener('message', filterMessage)
+  const promises = promisesType[type]
+  const workers = workersType[type]
+
+  if (!workers[index]) {
+    workers[index] = new Plotter()
+  }
+  let plotter = workers[index]
+
+  if (promises[index]) {
+    let value
+
+    try {
+      value = await Promise.race([promises[index], timeout(40)])
+    } catch (e) {
+      if (e !== 'CANCEL') {
+        throw e
       }
     }
-    plotter.addEventListener('message', filterMessage)
-  })
+    if (value === 'timeout') {
+      plotter.terminate()
+      promises[index]?.reject('CANCEL')
+      workers[index] = plotter = new Plotter()
+    }
+  }
+
+  plotter.postMessage({ ...message, uuid })
+  try {
+    let rej = null
+    promises[index] = new Promise((resolve, reject) => {
+      rej = reject
+      const filterMessage = ({ data }) => {
+        if (data.uuid === uuid) {
+          promises[index] = null
+          resolve(data)
+          plotter.removeEventListener('message', filterMessage)
+        }
+      }
+      plotter.addEventListener('message', filterMessage)
+    })
+    promises[index].reject = rej
+    const data = await promises[index]
+    return data
+  } catch (e) {
+    if (e !== 'CANCEL') {
+      throw e
+    }
+    return null
+  }
 }
 
-export const plotFunctions = async (
-  functions,
-  region,
-  recordings,
-  options = {}
-) => {
+export const plotFunctions = async (functions, region, recordings, job) => {
   const functionsText = functions
     .split(/[;\n]/)
     .map(fun => fun.trim())
@@ -44,8 +82,7 @@ export const plotFunctions = async (
     let recs
     let { type, funs, recIndexes, ...params } = getFunctionParams(
       functionsText[i],
-      region,
-      options
+      region
     )
     if (recIndexes) {
       recs = {}
@@ -57,30 +94,32 @@ export const plotFunctions = async (
       functionsTypeValues.push({ type, funs, recs, ...params })
     }
   }
-  // Create missing workers
+  // Order without affect
   for (let i = 0; i < functionsTypeValues.length; i++) {
-    if (!workers[i]) {
-      workers[i] = new Plotter()
-    }
     functionsTypeValues[i].index = i
   }
-  if (options.audio) {
+  // Remove sound when sound
+  if (job === 'sound') {
     functionsTypeValues = functionsTypeValues.filter(({ type }) =>
       ['sound', 'affect'].includes(type)
     )
   }
   // Plot functions
-  const data = await Promise.all(
-    functionsTypeValues.map(({ index, ...params }) =>
-      sendToPlotter(index, {
-        index,
-        region,
-        affects,
-        ...params,
-        ...options,
-      })
+  return (
+    await Promise.all(
+      functionsTypeValues.map(({ index, ...params }) =>
+        sendToPlotter(
+          index,
+          {
+            index,
+            region,
+            affects,
+            job,
+            ...params,
+          },
+          job
+        )
+      )
     )
-  )
-
-  return data
+  ).filter(x => x)
 }

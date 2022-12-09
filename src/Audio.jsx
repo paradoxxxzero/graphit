@@ -34,13 +34,10 @@ export const Audio = ({
       }
 
       const errors = []
-      const data = await plotFunctions(functions, null, recordings, {
-        audio: true,
-      })
+      const data = await plotFunctions(functions, null, recordings, 'sound')
 
       const sources = []
       for (let i = 0; i < data.length; i++) {
-        if (!data[i]) continue
         const { index, values, max: duration, samples, err } = data[i]
         if (err) {
           errors.push(err)

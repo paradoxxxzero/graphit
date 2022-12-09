@@ -195,9 +195,12 @@ export function App() {
     async functions => {
       setFunctionsText(functions)
 
-      const data = await plotFunctions(functions, state.region, recordings, {
-        check: true,
-      })
+      const data = await plotFunctions(
+        functions,
+        state.region,
+        recordings,
+        'check'
+      )
       const errors = data.map(d => d.err).filter(x => x)
       if (errors.length) {
         console.warn(...errors)

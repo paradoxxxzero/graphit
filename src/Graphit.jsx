@@ -48,20 +48,22 @@ export const Graphit = memo(
     )
     const j2y = useCallback(
       j => {
-        const { height } = canvasRef.current
+        let { height } = canvasRef.current
+        height -= codeRef.current.getBoundingClientRect().height
         const [, [ymin, ymax]] = region
         return ymin + (ymax - ymin) * ((height - j) / height)
       },
-      [region]
+      [region, codeRef]
     )
 
     const y2j = useCallback(
       y => {
-        const { height } = canvasRef.current
+        let { height } = canvasRef.current
+        height -= codeRef.current.getBoundingClientRect().height
         const [, [ymin, ymax]] = region
         return height - (y - ymin) * (height / (ymax - ymin))
       },
-      [region]
+      [region, codeRef]
     )
 
     const di2dx = useCallback(
@@ -174,13 +176,12 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      const data = await plotFunctions(functions, region, recordings)
+      const data = await plotFunctions(functions, region, recordings, 'plot')
       const errors = []
 
       redraw()
 
       for (let i = 0; i < data.length; i++) {
-        if (!data[i]) continue
         const { index, values, mode, type, err } = data[i]
         if (err) {
           errors.push(err)
@@ -406,7 +407,6 @@ export const Graphit = memo(
         enabled: region,
       }
     )
-
     return (
       <canvas
         ref={canvasRef}

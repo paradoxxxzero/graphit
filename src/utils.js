@@ -8,7 +8,7 @@ export function clamp(v, min, max) {
 }
 
 export async function timeout(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise(resolve => setTimeout(() => resolve('timeout'), ms))
 }
 
 export const regionEquals = (region1, region2) => {
@@ -124,14 +124,14 @@ export function getFunctionParams(fun, region) {
     if (min === null) {
       ;[min, max] = [0, 2 * Math.PI]
     }
-    samples = samples || region ? Math.min(region[0][2], region[1][2]) : 0
+    samples = samples || (region ? Math.min(region[0][2], region[1][2]) : 0)
   } else if ((match = fun.match(/^\s*{\s*x\s*=(.+),\s*y\s*=(.+)}\s*$/))) {
     type = 'parametric'
     funs = [match[1].trim(), match[2].trim()]
     if (min === null) {
       ;[min, max] = [0, 1]
     }
-    samples = samples || region ? Math.min(region[0][2], region[1][2]) : 0
+    samples = samples || (region ? Math.min(region[0][2], region[1][2]) : 0)
   } else if ((match = fun.match(/^\s*(\S+)\s*=(.+)$/))) {
     type = 'affect'
     funs = [match[1].trim(), match[2].trim()]
