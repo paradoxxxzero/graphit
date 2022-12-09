@@ -258,6 +258,13 @@ self.pulse = () => {
   return 0
 }
 
+self.peak = (t, freq, a = 1) => {
+  if (t === freq) {
+    return a
+  }
+  return 0
+}
+
 self.fft = (real, imag) => {
   const n = real.length
   if (n !== imag.length) {
@@ -820,7 +827,7 @@ const fftPlot = (plotters, type, region, min, max, step) => {
   const real = []
   const imag = []
   for (let n = 0; n < samples; n++) {
-    const [_, y] = evalPoint(plotters, type, n * step)
+    const [, y] = evalPoint(plotters, type, n * step)
     real.push(y)
     imag.push(0)
   }
@@ -841,6 +848,24 @@ const fftPlot = (plotters, type, region, min, max, step) => {
   return points
 }
 
+const ifftPlot = (plotters, type, region, min, max, step) => {
+  const samples = nextPowerOf2((max - min) / (max * step))
+  const points = []
+  const real = []
+  const imag = []
+  for (let n = 0; n < samples; n++) {
+    const [, y] = evalPoint(plotters, type, n)
+    real.push(0)
+    imag.push(y)
+  }
+
+  self.fft(real, imag)
+  for (let i = 0; i * step < max; i++) {
+    points.push(i * step, real[i])
+  }
+  return points
+}
+
 const evalPoint = (plotters, type, n) => {
   self._state.call = 0
   self._state.n = n
@@ -854,7 +879,7 @@ const evalPoint = (plotters, type, n) => {
   } else if (type === 'linear-horizontal') {
     const x = plotters[0](n)
     return [x, n]
-  } else if (['linear', 'sound', 'fft'].includes(type)) {
+  } else if (['linear', 'sound', 'fft', 'ifft'].includes(type)) {
     const y = plotters[0](n)
     return [n, y]
   }
@@ -986,10 +1011,17 @@ onmessage = ({
     } else if (job === 'sound') {
       values = new Float32Array((max - min) / step)
       let i = 0
-      for (let n = min; n < max; n += step) {
-        self._state.call = 0
-        self._state.n = n
-        values[i++] = plotters[0](n)
+      if (rendering === 'ifft') {
+        points = ifftPlot(plotters, type, region, min, max, step)
+        for (let n = 1; n < points.length; n += 2) {
+          values[i++] = points[n]
+        }
+      } else {
+        for (let n = min; n < max; n += step) {
+          self._state.call = 0
+          self._state.n = n
+          values[i++] = plotters[0](n)
+        }
       }
     } else {
       if (rendering === 'size') {
@@ -1000,6 +1032,8 @@ onmessage = ({
         points = autoPlot(plotters, type, region, min, max, step)
       } else if (rendering === 'fft') {
         points = fftPlot(plotters, type, region, min, max, step)
+      } else if (rendering === 'ifft') {
+        points = ifftPlot(plotters, type, region, min, max, step)
       }
 
       values = new Float32Array(points)

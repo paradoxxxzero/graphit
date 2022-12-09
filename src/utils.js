@@ -66,7 +66,9 @@ export function getFunctionParams(fun, region) {
     fun = match[1] + (match[3] || '')
     samples = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@\s*(auto|size|adaptative|fft)\s*(@.+|$)/))) {
+  if (
+    (match = fun.match(/(.+)@\s*(auto|size|adaptative|fft|ifft)\s*(@.+|$)/))
+  ) {
     fun = match[1] + (match[3] || '')
     rendering = match[2].trim()
   }
