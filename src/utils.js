@@ -118,7 +118,11 @@ export function getFunctionParams(fun, region) {
     }
     min = 0
     max = duration
-    samples = samples || duration * sampleRate
+    samples =
+      samples || (region && rendering !== 'fft')
+        ? region[0][2]
+        : duration * sampleRate
+
     funs = [match[3].trim()]
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
     type = 'polar'

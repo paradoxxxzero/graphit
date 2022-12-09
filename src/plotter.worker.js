@@ -265,6 +265,13 @@ self.peak = (t, freq, a = 1) => {
   return 0
 }
 
+self.band = (t, freqMin, freqMax, a = 1) => {
+  if (t > freqMin && t < freqMax) {
+    return a
+  }
+  return 0
+}
+
 self.fft = (real, imag) => {
   const n = real.length
   if (n !== imag.length) {
@@ -849,7 +856,7 @@ const fftPlot = (plotters, type, region, min, max, step) => {
 }
 
 const ifftPlot = (plotters, type, region, min, max, step) => {
-  const samples = nextPowerOf2((max - min) / (max * step))
+  const samples = nextPowerOf2((max - min) / step)
   const points = []
   const real = []
   const imag = []
@@ -860,7 +867,7 @@ const ifftPlot = (plotters, type, region, min, max, step) => {
   }
 
   self.fft(real, imag)
-  for (let i = 0; i * step < max; i++) {
+  for (let i = 0; i * step < max && i < real.length; i++) {
     points.push(i * step, real[i])
   }
   return points
@@ -879,11 +886,10 @@ const evalPoint = (plotters, type, n) => {
   } else if (type === 'linear-horizontal') {
     const x = plotters[0](n)
     return [x, n]
-  } else if (['linear', 'sound', 'fft', 'ifft'].includes(type)) {
+  } else {
     const y = plotters[0](n)
     return [n, y]
   }
-  throw new Error(`Unknown plot type ${type}`)
 }
 
 const modes = ['line', 'dot', 'point']

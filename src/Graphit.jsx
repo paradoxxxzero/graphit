@@ -49,7 +49,9 @@ export const Graphit = memo(
     const j2y = useCallback(
       j => {
         let { height } = canvasRef.current
-        height -= codeRef.current.getBoundingClientRect().height
+        height -=
+          codeRef.current.getBoundingClientRect().height *
+          window.devicePixelRatio
         const [, [ymin, ymax]] = region
         return ymin + (ymax - ymin) * ((height - j) / height)
       },
@@ -59,7 +61,9 @@ export const Graphit = memo(
     const y2j = useCallback(
       y => {
         let { height } = canvasRef.current
-        height -= codeRef.current.getBoundingClientRect().height
+        height -=
+          codeRef.current.getBoundingClientRect().height *
+          window.devicePixelRatio
         const [, [ymin, ymax]] = region
         return height - (y - ymin) * (height / (ymax - ymin))
       },
@@ -125,7 +129,9 @@ export const Graphit = memo(
         const j0 = clamp(
           y2j(0),
           0,
-          canvas.height - codeRef.current.getBoundingClientRect().height
+          canvas.height -
+            codeRef.current.getBoundingClientRect().height *
+              window.devicePixelRatio
         )
         const sx = i0 > canvas.width / 2 ? -1 : 1
         const sy = j0 > canvas.height / 2 ? -1 : 1
