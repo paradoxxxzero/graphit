@@ -1,7 +1,7 @@
 /* eslint-disable no-new-func */
 
 import doc from './doc'
-import { nextPowerOf2 } from './utils'
+import { nextPowerOf2, lerp } from './utils'
 
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -32,13 +32,13 @@ self.osc = (x, freq, type = 'sine', smooth = 0.5) => {
   if (self._state.n < 0) {
     return 0
   }
-  if (!self._state[k]) {
-    self._state[k] = {
+  if (!self._state.fs[k]) {
+    self._state.fs[k] = {
       f: 0,
       last_x: 0,
     }
   }
-  const state = self._state[k]
+  const state = self._state.fs[k]
   const dt = x - state.last_x // 1 / self._state.sampleRate
   state.last_x = x
   const f = (state.f += self.clamp(freq, 0, 22050) * dt)
@@ -111,9 +111,9 @@ self.iirFilterGen = genParams => (input, cutoff, bandwidth) => {
     return 0
   }
 
-  if (!self._state[k]) {
+  if (!self._state.fs[k]) {
     const [a, b] = genParams(cutoff, bandwidth)
-    self._state[k] = {
+    self._state.fs[k] = {
       a,
       b,
       x: new Array(a.length).fill(0),
@@ -121,7 +121,7 @@ self.iirFilterGen = genParams => (input, cutoff, bandwidth) => {
     }
   }
 
-  const state = self._state[k]
+  const state = self._state.fs[k]
   const { a, b, x, y } = state
   let output = 0
   for (let i = 0; i < a.length; i++) {
@@ -200,17 +200,17 @@ self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
 //     return 0
 //   }
 
-//   if (!self._state[k]) {
+//   if (!self._state.fs[k]) {
 //     const dt = self._state.n
 
-//     self._state[k] = {
+//     self._state.fs[k] = {
 //       last_value: input * (dt / (rc + dt)),
 //       last_x: x,
 //     }
-//     return self._state[k].last_value
+//     return self._state.fs[k].last_value
 //   }
 
-//   const state = self._state[k]
+//   const state = self._state.fs[k]
 //   const dt = x - state.last_x
 //   state.last_x = 0
 //   const alpha = dt / (rc + dt)
@@ -227,15 +227,15 @@ self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
 //     return 0
 //   }
 
-//   if (!self._state[k]) {
-//     self._state[k] = {
+//   if (!self._state.fs[k]) {
+//     self._state.fs[k] = {
 //       last_value: input,
 //       last_input: input,
 //       last_x: 0,
 //     }
-//     return self._state[k].last_value
+//     return self._state.fs[k].last_value
 //   }
-//   const state = self._state[k]
+//   const state = self._state.fs[k]
 //   const dt = x - state.last_x
 //   state.last_x = x
 //   const alpha = rc / (rc + dt)
@@ -250,16 +250,19 @@ self.pulse = () => {
   if (self._state.n < 0) {
     return 0
   }
-  const state = self._state[k]
+  const state = self._state.fs[k]
   if (!state) {
-    self._state[k] = true
+    self._state.fs[k] = true
     return 1
   }
   return 0
 }
 
 self.peak = (t, freq, a = 1) => {
-  if (t === freq) {
+  const k = ++self._state.call
+
+  if (t >= freq && !self._state.fs[k]) {
+    self._state.fs[k] = true
     return a
   }
   return 0
@@ -272,7 +275,87 @@ self.band = (t, freqMin, freqMax, a = 1) => {
   return 0
 }
 
-self.fft = (real, imag) => {
+self.fft = input => {
+  const k = ++self._state.call
+  const state = self._state.rfs[k]
+  if (self._state.processing) {
+    if (self._state.processing === k) {
+      const samples2 = nextPowerOf2(state.inputs.length)
+      const real = new Float32Array(samples2)
+      const imag = new Float32Array(samples2)
+      for (let i = 0; i < samples2; i++) {
+        real[i] =
+          i < state.inputs.length
+            ? state.inputs[i]
+            : Math.sin(TAU * i * self._state.step * 1250)
+        imag[i] = 0
+      }
+      self._fft(real, imag)
+
+      state.outputs = []
+      const fMax = 2 / samples2
+
+      for (let i = 0; i < state.inputs.length; i++) {
+        const j = ~~((samples2 / 2) * (i / state.inputs.length))
+        state.outputs[i] = fMax * Math.sqrt(real[j] ** 2 + imag[j] ** 2)
+      }
+      // for (let i = 0; i < samples2 / 2; i++) {
+      //   state.outputs[~~((state.inputs.length * 2 * i) / samples2)] =
+      //     fMax * Math.sqrt(real[i] ** 2 + imag[i] ** 2)
+      // }
+    }
+    return
+  }
+  if (!state) {
+    self._state.rfs[k] = {
+      inputs: [input],
+    }
+    self._state.toPostProcess.push(k)
+    return 0
+  } else if (state.outputs) {
+    return state.outputs[self._state.i]
+  }
+  state.inputs[self._state.i] = input
+  return 0
+}
+
+self.ifft = input => {
+  const k = ++self._state.call
+  const state = self._state.rfs[k]
+  if (self._state.processing) {
+    if (self._state.processing === k) {
+      const samples2 = nextPowerOf2(state.inputs.length)
+      const real = new Float32Array(samples2)
+      const imag = new Float32Array(samples2)
+      for (let i = 0; i < samples2; i++) {
+        real[i] = 0
+        imag[i] = i < state.inputs.length ? state.inputs[i] : 0
+      }
+      self._fft(real, imag)
+
+      state.outputs = []
+      for (let i = 0; i < state.inputs.length; i++) {
+        const j = ~~((samples2 / 2) * (i / state.inputs.length))
+        state.outputs[i] = real[j]
+      }
+    }
+    return
+  }
+  if (!state) {
+    self._state.rfs[k] = {
+      inputs: [input],
+    }
+    self._state.toPostProcess.push(k)
+    return 0
+  } else if (state.outputs) {
+    return state.outputs[self._state.i]
+  }
+
+  state.inputs[self._state.i] = input
+  return 0
+}
+
+self._fft = (real, imag) => {
   const n = real.length
   if (n !== imag.length) {
     throw new Error('Mismatched lengths')
@@ -532,11 +615,14 @@ const affineExtremums = (points, plotters, type, region) => {
   }
 }
 
-const adaptativePlot = (plotters, type, region, min, max, step) => {
+const adaptativePlot = (plotters, type, region, min, max, samples) => {
   let points = []
   // const t0 = performance.now()
   // const lens = [points.length]
-  for (let n = min; n < max; n += step) {
+
+  const step = (max - min) / samples
+  for (let k = 0; k < samples; k++) {
+    const n = min + k * step
     const [x, y] = evalPoint(plotters, type, n)
     pushBounded(points, x, y, region, type)
   }
@@ -557,7 +643,7 @@ const adaptativePlot = (plotters, type, region, min, max, step) => {
   return points
 }
 
-const autoPlot = (plotters, type, region, min, max, step) => {
+const autoPlot = (plotters, type, region, min, max, samples) => {
   const len = max - min
   min -= (len * auto.overflow) / 2
   max += (len * auto.overflow) / 2
@@ -569,7 +655,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   const [X, Y] = type === 'linear-horizontal' ? [1, 0] : [0, 1]
   const verticalRegion = region[type === 'linear-horizontal' ? 0 : 1]
   const horizontalRegion = region[type === 'linear-horizontal' ? 1 : 0]
-  const k =
+  const r =
     (verticalRegion[1] - verticalRegion[0]) /
     (horizontalRegion[1] - horizontalRegion[0])
 
@@ -579,7 +665,9 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   let consecutive = { min: [], max: [] }
   let skipping = false
 
-  for (let n = min; n <= max; n += step) {
+  const step = (max - min) / samples
+  for (let k = 0; k < samples; k++) {
+    const n = min + k * step
     // Working for pixel n -> n + step
     last = point
     point = next
@@ -592,8 +680,8 @@ const autoPlot = (plotters, type, region, min, max, step) => {
 
     // Start by removing straight lines
     if (!isNaN(last[Y]) && !blocking && n < max - step) {
-      const angleLast = Math.atan2(point[Y] - last[Y], k * (point[X] - last[X]))
-      const angleNext = Math.atan2(next[Y] - point[Y], k * (next[X] - point[X]))
+      const angleLast = Math.atan2(point[Y] - last[Y], r * (point[X] - last[X]))
+      const angleNext = Math.atan2(next[Y] - point[Y], r * (next[X] - point[X]))
       const angle = angleNext - angleLast
       const absAngle = Math.abs(angle)
 
@@ -609,7 +697,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
       } else if (skipping) {
         skipping = false
         // Rewind
-        n -= step
+        k--
         next = point
         point = last
       }
@@ -769,7 +857,7 @@ const autoPlot = (plotters, type, region, min, max, step) => {
     if (blocking) {
       if (
         (consecutive.min.length < 1 && consecutive.max.length < 1) ||
-        n > max - step
+        k === samples - 1
       ) {
         // Closing block
         // if (blocking.min.length > auto.minBlockSize) {
@@ -819,32 +907,35 @@ const autoPlot = (plotters, type, region, min, max, step) => {
   return points
 }
 
-const sizePlot = (plotters, type, region, min, max, step) => {
+const sizePlot = (plotters, type, region, min, max, samples) => {
   const points = []
-  for (let n = min; n < max; n += step) {
+
+  const step = (max - min) / samples
+  for (let k = 0; k < samples; k++) {
+    const n = min + k * step
     const [x, y] = evalPoint(plotters, type, n)
     points.push(x, y)
   }
   return points
 }
 
-const fftPlot = (plotters, type, region, min, max, step) => {
-  const samples = nextPowerOf2((max - min) / (max * step))
+const fftPlot = (plotters, type, region, min, max, samples) => {
+  const samples2 = nextPowerOf2(samples)
   const points = []
-  const real = []
-  const imag = []
-  for (let n = 0; n < samples; n++) {
-    const [, y] = evalPoint(plotters, type, n * step)
-    real.push(y)
-    imag.push(0)
+  const real = new Float32Array(samples2)
+  const imag = new Float32Array(samples2)
+  const step = (max - min) / samples2
+  for (let k = 0; k < samples2; k++) {
+    const [, y] = evalPoint(plotters, type, min + k * step)
+    real[k] = y
+    imag[k] = 0
   }
 
-  self.fft(real, imag)
-  const fMax = 2 / samples
-  const bw = fMax / (2 * step)
-
-  const downsampling = Math.max(1, ~~(samples / region[0][2]))
-  for (let i = 0; i < samples / 2; i++) {
+  self._fft(real, imag)
+  const fMax = 2 / samples2
+  const bw = samples2 * step
+  const downsampling = Math.max(1, ~~(samples2 / region[0][2]))
+  for (let i = 0; i < samples2 / 2; i++) {
     let i0 = i,
       a = 0
     for (; i - i0 < downsampling; i++) {
@@ -855,18 +946,20 @@ const fftPlot = (plotters, type, region, min, max, step) => {
   return points
 }
 
-const ifftPlot = (plotters, type, region, min, max, step) => {
-  const samples = nextPowerOf2((max - min) / step)
+const ifftPlot = (plotters, type, region, min, max, samples) => {
+  const samples2 = nextPowerOf2(samples)
   const points = []
-  const real = []
-  const imag = []
-  for (let n = 0; n < samples; n++) {
-    const [, y] = evalPoint(plotters, type, n)
-    real.push(0)
-    imag.push(y)
+  const real = new Float32Array(samples2)
+  const imag = new Float32Array(samples2)
+
+  const step = (max - min) / samples2
+  for (let k = 0; k < samples2; k++) {
+    const [, y] = evalPoint(plotters, type, min + k * step)
+    real[k] = 0
+    imag[k] = y
   }
 
-  self.fft(real, imag)
+  self._fft(real, imag)
   for (let i = 0; i * step < max && i < real.length; i++) {
     points.push(i * step, real[i])
   }
@@ -876,6 +969,7 @@ const ifftPlot = (plotters, type, region, min, max, step) => {
 const evalPoint = (plotters, type, n) => {
   self._state.call = 0
   self._state.n = n
+  self._state.i++
   if (type === 'parametric') {
     const x = plotters[0](n)
     const y = plotters[1](n)
@@ -933,10 +1027,8 @@ onmessage = ({
     if (typeof samples === 'string') {
       samples = new Function('return ' + samples)()
     }
-
-    const step = (max - min) / samples
-    if (isNaN(step) || step === 0) {
-      throw new Error(`Invalid step ${step}`)
+    if (isNaN(samples) || samples === 0) {
+      throw new Error(`Invalid sample size ${samples}`)
     }
     if (!rendering) {
       if (['linear', 'linear-horizontal'].includes(type)) {
@@ -968,12 +1060,24 @@ onmessage = ({
 
     self._state = {
       call: 0,
+      i: -1,
+      fs: [],
+      rfs: [],
       min,
       max,
-      step,
+      samples,
+      step: (max - min) / samples,
+      toPostProcess: [],
+      processing: null,
+    }
+    let prefix = ''
+    if (type === 'sound') {
+      // TODO: Handle duration
+      const t2f = samples / 2
+      prefix = `let f = t * ${t2f};`
     }
     const plotters = funs.map(
-      fun => new Function(TYPE_VARIABLES[type], 'return ' + fun)
+      fun => new Function(TYPE_VARIABLES[type], prefix + 'return ' + fun)
     )
     if (job === 'check') {
       self._state.call = self._state.n = 0
@@ -1015,32 +1119,55 @@ onmessage = ({
         ]
       }
     } else if (job === 'sound') {
-      values = new Float32Array((max - min) / step)
+      values = new Float32Array(samples)
       let i = 0
       if (rendering === 'ifft') {
-        points = ifftPlot(plotters, type, region, min, max, step)
+        points = ifftPlot(plotters, type, region, min, max, samples)
         for (let n = 1; n < points.length; n += 2) {
           values[i++] = points[n]
         }
       } else {
-        for (let n = min; n < max; n += step) {
-          self._state.call = 0
-          self._state.n = n
-          values[i++] = plotters[0](n)
-        }
+        do {
+          if (self._state.toPostProcess.length) {
+            self._state.processing = self._state.toPostProcess.shift()
+            evalPoint(plotters, type, 0)
+            self._state.processing = null
+            self._state.i = -1
+            self._state.fs = []
+            i = 0
+          }
+
+          const step = (max - min) / samples
+          for (let k = 0; k < samples; k++) {
+            const n = min + k * step
+            self._state.call = 0
+            self._state.n = n
+            self._state.i++
+            values[i++] = plotters[0](n)
+          }
+        } while (self._state.toPostProcess.length)
       }
     } else {
-      if (rendering === 'size') {
-        points = sizePlot(plotters, type, region, min, max, step)
-      } else if (rendering === 'adaptative') {
-        points = adaptativePlot(plotters, type, region, min, max, step)
-      } else if (rendering === 'auto') {
-        points = autoPlot(plotters, type, region, min, max, step)
-      } else if (rendering === 'fft') {
-        points = fftPlot(plotters, type, region, min, max, step)
-      } else if (rendering === 'ifft') {
-        points = ifftPlot(plotters, type, region, min, max, step)
-      }
+      do {
+        if (self._state.toPostProcess.length) {
+          self._state.processing = self._state.toPostProcess.shift()
+          evalPoint(plotters, type, 0)
+          self._state.processing = null
+          self._state.i = -1
+          self._state.fs = []
+        }
+        if (rendering === 'size') {
+          points = sizePlot(plotters, type, region, min, max, samples)
+        } else if (rendering === 'adaptative') {
+          points = adaptativePlot(plotters, type, region, min, max, samples)
+        } else if (rendering === 'auto') {
+          points = autoPlot(plotters, type, region, min, max, samples)
+        } else if (rendering === 'fft') {
+          points = fftPlot(plotters, type, region, min, max, samples)
+        } else if (rendering === 'ifft') {
+          points = ifftPlot(plotters, type, region, min, max, samples)
+        }
+      } while (self._state.toPostProcess.length)
 
       values = new Float32Array(points)
     }

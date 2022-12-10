@@ -218,9 +218,9 @@ export function App() {
                 Math.max(acc[0][2], preferredRegion[0][2]),
               ],
               [
-                Math.min(acc[0][0], preferredRegion[0][0]),
-                Math.max(acc[0][1], preferredRegion[0][1]),
-                Math.max(acc[0][2], preferredRegion[0][2]),
+                Math.min(acc[1][0], preferredRegion[1][0]),
+                Math.max(acc[1][1], preferredRegion[1][1]),
+                Math.max(acc[1][2], preferredRegion[1][2]),
               ],
             ]
           } else {
