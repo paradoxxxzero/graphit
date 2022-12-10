@@ -193,7 +193,7 @@ export const Graphit = memo(
           errors.push(err)
           continue
         }
-        ctx.fillStyle = ctx.strokeStyle = theme.colors[index]
+        ctx.fillStyle = ctx.strokeStyle = theme.colors[index] + 'bb'
         // ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
         ctx.beginPath()
         let line = false,
