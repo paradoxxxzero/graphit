@@ -275,6 +275,42 @@ self.band = (t, freqMin, freqMax, a = 1) => {
   return 0
 }
 
+self.normalize = (input, cap = Infinity, avg = true) => {
+  const k = ++self._state.call
+  const state = self._state.rfs[k]
+  if (self._state.processing) {
+    if (self._state.processing === k) {
+      let amax = 0,
+        aavg = 0
+
+      let m = 1
+      for (let i = 0; i < state.inputs.length; i++) {
+        const a = Math.abs(state.inputs[i])
+        if (a < 1) {
+          aavg = aavg + (a - aavg) / m++
+        }
+        if (amax < a && a < cap) {
+          amax = a
+        }
+      }
+      state.amax = amax
+      state.aavg = aavg
+    }
+    return
+  }
+  if (!state) {
+    self._state.rfs[k] = {
+      inputs: [input],
+    }
+    self._state.toPostProcess.push(k)
+    return 0
+  } else if (state.amax) {
+    return input / ((avg ? state.aavg : 1) * state.amax)
+  }
+  state.inputs[self._state.i] = input
+  return 0
+}
+
 self.fft = input => {
   const k = ++self._state.call
   const state = self._state.rfs[k]
@@ -284,10 +320,7 @@ self.fft = input => {
       const real = new Float32Array(samples2)
       const imag = new Float32Array(samples2)
       for (let i = 0; i < samples2; i++) {
-        real[i] =
-          i < state.inputs.length
-            ? state.inputs[i]
-            : Math.sin(TAU * i * self._state.step * 1250)
+        real[i] = i < state.inputs.length ? state.inputs[i] : 0
         imag[i] = 0
       }
       self._fft(real, imag)
@@ -299,10 +332,6 @@ self.fft = input => {
         const j = ~~((samples2 / 2) * (i / state.inputs.length))
         state.outputs[i] = fMax * Math.sqrt(real[j] ** 2 + imag[j] ** 2)
       }
-      // for (let i = 0; i < samples2 / 2; i++) {
-      //   state.outputs[~~((state.inputs.length * 2 * i) / samples2)] =
-      //     fMax * Math.sqrt(real[i] ** 2 + imag[i] ** 2)
-      // }
     }
     return
   }
@@ -336,7 +365,7 @@ self.ifft = input => {
       state.outputs = []
       for (let i = 0; i < state.inputs.length; i++) {
         const j = ~~((samples2 / 2) * (i / state.inputs.length))
-        state.outputs[i] = real[j]
+        state.outputs[i] = imag[j]
       }
     }
     return
@@ -1072,8 +1101,7 @@ onmessage = ({
     }
     let prefix = ''
     if (type === 'sound') {
-      // TODO: Handle duration
-      const t2f = samples / 2
+      const t2f = samples / (2 * max * max)
       prefix = `let f = t * ${t2f};`
     }
     const plotters = funs.map(
