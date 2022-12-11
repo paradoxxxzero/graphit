@@ -1,7 +1,8 @@
 /* eslint-disable no-new-func */
 
 import doc from './doc'
-import { nextPowerOf2, lerp } from './utils'
+import { nextPowerOf2 } from './utils'
+import * as easings from './easings'
 
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -26,8 +27,9 @@ const TAU = (self.tau = self.TAU = PI * 2)
 self.eta = self.ETA = PI / 2
 
 self.ln = self.log
+self.easings = easings
 
-self.osc = (x, freq, type = 'sine', smooth = 0.5) => {
+self.osc = (x, freq, type = 'sine', param) => {
   const k = ++self._state.call
   if (self._state.n < 0) {
     return 0
@@ -42,32 +44,89 @@ self.osc = (x, freq, type = 'sine', smooth = 0.5) => {
   const dt = x - state.last_x // 1 / self._state.sampleRate
   state.last_x = x
   const f = (state.f += self.clamp(freq, 0, 22050) * dt)
+  const m = f % 1
+  const hr = (f + 0.25) % 1
+  const r = 4 * (hr > 0.5 ? 1 - hr : hr) - 1
 
   switch (type) {
     case 'sine':
       return Math.sin(f * TAU)
+    case 'expsine':
+      return Math.pow(Math.sin(f * TAU), param * 2 + 1)
     case 'square':
       return Math.sign(Math.sin(f * TAU))
     case 'smoothsquare':
-      return Math.tanh(Math.sin(f * TAU) / smooth)
+      return Math.tanh(Math.sin(f * TAU) / param)
     case 'sawtooth':
-      return (f % 1) * 2 - 1
+      return m * 2 - 1
     case 'triangle':
-      return Math.abs((f % 1) * 4 - 2) - 1
+      return Math.abs(m * 4 - 2) - 1
     case 'noise':
       return Math.random() * 2 - 1
+    case 'spiky':
+      return Math.tan(1.5 * r) / Math.tan(1.5)
+    case 'shark':
+      return Math.SQRT2 * Math.sqrt(r + 1) - 1
+    case 'squarecircle':
+      return 2 * Math.sqrt(1 - r ** 2) - 1
+    case 'circle':
+      return m > 0.5
+        ? -Math.sqrt(1 - ((m - 0.5) * 4 - 1) ** 2)
+        : Math.sqrt(1 - (m * 4 - 1) ** 2)
     default:
       throw new Error(`Unknown oscillator type: ${type}`)
   }
 }
 
-self.sine = (x, freq) => self.osc(x, freq, 'sine')
-self.square = (x, freq) => self.osc(x, freq, 'square')
-self.smoothsquare = (x, freq, smooth = 0.5) =>
-  self.osc(x, freq, 'smoothsquare', smooth)
-self.sawtooth = (x, freq) => self.osc(x, freq, 'sawtooth')
-self.triangle = (x, freq) => self.osc(x, freq, 'triangle')
-self.noise = () => self.osc(0, 0, 'noise')
+self.oscEase = (x, freq, from, to, easing = 'linear', paramFrom, paramTo) => {
+  return (typeof easing === 'string' ? easings[easing] : easing)(
+    self.osc(x, freq, from, paramFrom),
+    self.osc(x, freq, to, paramTo),
+    x / self._state.max
+  )
+}
+
+self.transform = (x, freq, type = 'hardtooth') => {
+  const k = ++self._state.call
+  if (self._state.n < 0) {
+    return 0
+  }
+  if (!self._state.fs[k]) {
+    self._state.fs[k] = {
+      f: 0,
+      last_x: 0,
+    }
+  }
+  const state = self._state.fs[k]
+  const dt = x - state.last_x // 1 / self._state.sampleRate
+  state.last_x = x
+  const f = (state.f += self.clamp(freq, 0, 22050) * dt)
+  const t = x / self._state.max
+  const m = f % 1
+  // const hr = (f + 0.25) % 1
+  // const r = 4 * (hr > 0.5 ? 1 - hr : hr) - 1
+
+  switch (type) {
+    case 'hardtooth':
+      return m * 2 - 1 + 0.1 * m * t * Math.sin(10000 * x)
+    default:
+      throw new Error(`Unknown transition type: ${type}`)
+  }
+}
+;[
+  'sine',
+  'square',
+  'smoothsquare',
+  'sawtooth',
+  'triangle',
+  'noise',
+  'magic',
+  'expsine',
+  'hcircle',
+  'circle',
+].forEach(oscType => {
+  self[oscType] = (x, freq, ...args) => self.osc(x, freq, oscType, ...args)
+})
 
 self.oscs = (x, freqs, type, smooth = 0.5) => {
   let sum = 0
