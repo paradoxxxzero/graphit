@@ -120,8 +120,7 @@ export function getFunctionParams(fun, region) {
     max = duration
     samples = duration * sampleRate
     samples =
-      samples ||
-      (region && rendering !== 'fft' ? region[0][2] : duration * sampleRate)
+      region && rendering !== 'fft' ? region[0][2] : duration * sampleRate
 
     funs = [match[3].trim()]
   } else if ((match = fun.match(/^\s*r\s*=(.+)$/))) {
