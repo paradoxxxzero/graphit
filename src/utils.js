@@ -58,11 +58,14 @@ export function getFunctionParams(fun, region) {
     samples = null,
     rendering = null,
     mode = 'line'
-  if ((match = fun.match(/(.+)@\/([^@]+)(@.+|$)/))) {
+  if ((match = fun.match(/(.+)@@.+$/))) {
+    fun = match[1]
+  }
+  if ((match = fun.match(/(.+)@\/\s*([^@]+)(@.+|$)/))) {
     fun = match[1] + (match[3] || '')
     mode = match[2].trim()
   }
-  if ((match = fun.match(/(.+)@!([^@]+)(@.+|$)/))) {
+  if ((match = fun.match(/(.+)@!\s*([^@]+)(@.+|$)/))) {
     fun = match[1] + (match[3] || '')
     samples = match[2].trim()
   }

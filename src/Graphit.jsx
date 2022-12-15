@@ -182,6 +182,23 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
+      let match
+      if (
+        (match = functions.match(
+          /@@\s*(.+)\s*->\s*(.+)(?:\s*x\s*(.+)\s*->\s*(.+)\s*)?$/
+        ))
+      ) {
+        onRegion([
+          [match[1], match[2], region[0][2]],
+          match[3]
+            ? [match[3], match[4], region[1][2]]
+            : [
+                (match[1] * canvas.height) / canvas.width,
+                (match[2] * canvas.height) / canvas.width,
+                region[1][2],
+              ],
+        ])
+      }
       const data = await plotFunctions(functions, region, recordings, 'plot')
       const errors = []
 
@@ -267,6 +284,7 @@ export const Graphit = memo(
       codeRef,
       dx2di,
       dy2dj,
+      onRegion,
     ])
 
     const size = useCallback(() => {
@@ -410,7 +428,7 @@ export const Graphit = memo(
       },
       {
         target: canvasRef,
-        enabled: region,
+        enabled: region && !functions.match(/@@.+$/),
       }
     )
     return (
