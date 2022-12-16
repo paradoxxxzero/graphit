@@ -61,9 +61,6 @@ export function getFunctionParams(fun, region) {
     mode = null,
     interpolation = null
 
-  if ((match = fun.match(/(.+)@@.+$/))) {
-    fun = match[1]
-  }
   if ((match = fun.match(/(.+)@!\s*([^@]+)(@.+|$)/))) {
     fun = match[1] + (match[3] || '')
     samples = match[2].trim()
@@ -226,9 +223,9 @@ export const cubicInterpolation = (points, precision) => {
   }
   const result = []
 
-  for (let i = 0; i < n + 1; i++) {
+  for (let i = 0; i < n; i++) {
     result.push(x[i], a[i])
-    if (i === n || h[i] === 0) {
+    if (h[i] === 0) {
       continue
     }
     for (let j = 1; j < precision; j++) {
@@ -267,9 +264,9 @@ export const quadraticInterpolation = (points, precision) => {
     c[i] = h[i] !== 0 ? (g[i] - b[i]) / h[i] : 0
   }
   const result = []
-  for (let i = 0; i < n + 1; i++) {
+  for (let i = 0; i < n; i++) {
     result.push(x[i], a[i])
-    if (i === n || h[i] === 0) {
+    if (h[i] === 0) {
       continue
     }
     for (let j = 1; j < precision; j++) {
@@ -296,9 +293,9 @@ export const lagrangeInterpolation = (points, precision) => {
     h[i] = x[i + 1] - x[i]
   }
 
-  for (let i = 0; i < n + 1; i++) {
+  for (let i = 0; i < n; i++) {
     result.push(x[i], a[i])
-    if (i === n || h[i] === 0) {
+    if (h[i] === 0) {
       continue
     }
     for (let j = 1; j < precision; j++) {
@@ -335,9 +332,9 @@ export const trigonometricInterpolation = (points, precision) => {
     h[i] = x[i + 1] - x[i]
   }
 
-  for (let i = 0; i < n + 1; i++) {
+  for (let i = 0; i < n; i++) {
     result.push(x[i], a[i])
-    if (i === n || h[i] === 0) {
+    if (h[i] === 0) {
       continue
     }
     for (let j = 1; j < precision; j++) {
@@ -356,4 +353,19 @@ export const trigonometricInterpolation = (points, precision) => {
     }
   }
   return result
+}
+
+export const interpolate = type => {
+  switch (type) {
+    case 'cubic':
+      return cubicInterpolation
+    case 'quadratic':
+      return quadraticInterpolation
+    case 'lagrange':
+      return lagrangeInterpolation
+    case 'trigonometric':
+      return trigonometricInterpolation
+    default:
+      return cubicInterpolation
+  }
 }

@@ -182,24 +182,31 @@ export const Graphit = memo(
         }
         ctx.stroke()
       }
-      let match
+      let match,
+        finalFunctions = functions
       if (
         (match = functions.match(
-          /@@\s*(.+)\s*->\s*(.+)(?:\s*x\s*(.+)\s*->\s*(.+)\s*)?$/
+          /(.+)@@\s*([^,]+)\s*,\s*([^;]+)(?:\s*;\s*([^,]+)\s*,\s*(.+))?\s*$/
         ))
       ) {
+        finalFunctions = match[1]
         onRegion([
-          [match[1], match[2], region[0][2]],
-          match[3]
-            ? [match[3], match[4], region[1][2]]
+          [match[2], match[3], region[0][2]],
+          match[4]
+            ? [match[4], match[5], region[1][2]]
             : [
-                (match[1] * canvas.height) / canvas.width,
                 (match[2] * canvas.height) / canvas.width,
+                (match[3] * canvas.height) / canvas.width,
                 region[1][2],
               ],
         ])
       }
-      const data = await plotFunctions(functions, region, recordings, 'plot')
+      const data = await plotFunctions(
+        finalFunctions,
+        region,
+        recordings,
+        'plot'
+      )
       const errors = []
 
       redraw()

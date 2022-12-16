@@ -148,7 +148,7 @@ function urlMiddleware(reducer) {
   }
 }
 function plotCompletions(context) {
-  let word = context.matchBefore(/[\w@$/]*/)
+  let word = context.matchBefore(/[\w@$/!]+/)
   if (word.from === word.to && !context.explicit) return null
   return {
     from: word.from,
@@ -195,11 +195,15 @@ export function App() {
 
   const handleFunctions = useCallback(
     async functions => {
-      console.log('handleFunctions', functions)
       setFunctionsText(functions)
+      let match,
+        evalFunctions = functions
+      if ((match = functions.match(/(.+)@@.+$/))) {
+        evalFunctions = match[1]
+      }
 
       const data = await plotFunctions(
-        functions,
+        evalFunctions,
         state.region,
         recordings,
         'check'

@@ -1,19 +1,28 @@
+import { OSCILLATIONS } from './static'
 export default {
   // Sound functions
   sound: {
-    adsr: 'adsr usage: (x, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5, duration = <sound duration>)',
-    osc: 'osc usage: (x, freq, type = sine|square|smoothsquare|sawtooth|triangle|noise, smooth = 0.5)',
-    oscs: 'oscs usage: (x, freqs, type = sine|square|smoothsquare|sawtooth|triangle|noise, smooth = 0.5)',
-    sine: 'sine usage: (x, freq)',
-    square: 'square usage: (x, freq)',
-    smoothsquare: 'smoothsquare usage: (x, freq, smooth = 0.5)',
-    sawtooth: 'sawtooth usage: (x, freq)',
-    triangle: 'triangle usage: (x, freq)',
-    noise: 'noise usage: (x)',
-    lowpass: 'lowpass usage: (x, input, cutoff)',
-    highpass: 'highpass usage: (x, input, cutoff)',
-    segment: 'segment usage: (x, ...pairs)',
-    at: 'at usage: (d, f, x)',
+    adsr: 'adsr usage: (t, attack = 0.2, decay = 0.1, sustain = 0.4, release = 0.3, sustainLevel = 0.5, duration = <sound duration>)',
+    osc: `osc usage: (t, freq, type = ${OSCILLATIONS.join('|')}, ...param)`,
+    oscs: `oscs usage: (t, freqs, type = ${OSCILLATIONS.join('|')}, ...param)`,
+    ...Object.fromEntries(
+      OSCILLATIONS.map(key => [key, `${key} usage: (t, freq, ...param)`])
+    ),
+    oscEase: `oscEase usage: (t, freq, from, to, easing, ...param)`,
+    transform: 'transform usage: (t, freq, type)',
+    lowpass: 'lowpass usage: (t, input, cutoff)',
+    lowpass4: 'lowpass usage: (t, input, cutoff)',
+    highpass: 'highpass usage: (t, input, cutoff)',
+    bandpass: 'bandpass usage: (t, input, cutoff, bandwidth)',
+    bandstop: 'bandstop usage: (t, input, cutoff, bandwidth)',
+    pulse: 'pulse usage: ()',
+    peak: 'peak usage: (t, freq, amplitude=1)',
+    band: 'band usage: (t, freqMin, freqMax, amplitude=1)',
+    normalize: 'normalize usage: (input, cap = Infinity, avg: true)',
+    fft: 'fft usage: (input)',
+    ifft: 'ifft usage (input)',
+    segment: 'segment usage: (t, ...pairs)',
+    at: 'at usage: (d, f, t)',
   },
 
   // MATH functions
@@ -37,6 +46,7 @@ export default {
     fround: 'Returns the nearest single precision float representation of x.',
     hypot: 'Returns the square root of the sum of squares of its arguments.',
     imul: 'Returns the result of the 32-bit integer multiplication of x and y.',
+    ln: 'Returns the natural logarithm (㏒e; also, ㏑) of x.',
     log: 'Returns the natural logarithm (㏒e; also, ㏑) of x.',
     log1p:
       'Returns the natural logarithm (㏒e; also ㏑) of 1 + x for the number x.',

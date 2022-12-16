@@ -1,15 +1,9 @@
 /* eslint-disable no-new-func */
 
 import doc from './doc'
-import {
-  nextPowerOf2,
-  cubicInterpolation,
-  quadraticInterpolation,
-  lagrangeInterpolation,
-  trigonometricInterpolation,
-} from './utils'
 import * as easings from './easings'
-import { MODES } from './static'
+import { MODES, OSCILLATIONS } from './static'
+import { interpolate, nextPowerOf2 } from './utils'
 
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -38,6 +32,9 @@ self.ln = self.log
 self.easings = easings
 
 self.osc = (x, freq, type = 'sine', param) => {
+  if (freq === 0) {
+    return 0
+  }
   const k = ++self._state.call
   if (self._state.n < 0) {
     return 0
@@ -81,6 +78,26 @@ self.osc = (x, freq, type = 'sine', param) => {
       return m > 0.5
         ? -Math.sqrt(1 - ((m - 0.5) * 4 - 1) ** 2)
         : Math.sqrt(1 - (m * 4 - 1) ** 2)
+    case 'wave':
+      if (!state.interp) {
+        let points = param,
+          interpolation = 'cubic'
+        if (!Array.isArray(points)) {
+          interpolation = points.interpolation
+          points = points.points
+        }
+
+        state.interp = interpolate(interpolation)(
+          points,
+          self._state.samples / (self._state.max * (points.length - 1) * freq)
+        )
+      }
+      for (let i = 0; i < state.interp.length; i += 2) {
+        if (state.interp[i] >= m) {
+          return state.interp[i + 1]
+        }
+      }
+      return 0
     default:
       throw new Error(`Unknown oscillator type: ${type}`)
   }
@@ -121,18 +138,7 @@ self.transform = (x, freq, type = 'hardtooth') => {
       throw new Error(`Unknown transition type: ${type}`)
   }
 }
-;[
-  'sine',
-  'square',
-  'smoothsquare',
-  'sawtooth',
-  'triangle',
-  'noise',
-  'magic',
-  'expsine',
-  'hcircle',
-  'circle',
-].forEach(oscType => {
+OSCILLATIONS.forEach(oscType => {
   self[oscType] = (x, freq, ...args) => self.osc(x, freq, oscType, ...args)
 })
 
@@ -245,7 +251,7 @@ self.bandpass = self.iirFilterGen((cutoff, bandwidth) => {
   ]
 })
 
-self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
+self.bandstop = self.iirFilterGen((cutoff, bandwidth) => {
   const fc = cutoff * self._state.step
   const bw = bandwidth * self._state.step
   const c = 2 * Math.cos(TAU * fc)
@@ -258,59 +264,6 @@ self.bandreject = self.iirFilterGen((cutoff, bandwidth) => {
     [R * c, -R * R],
   ]
 })
-
-// self.lowpass = (x, input, cutoff) => {
-//   const k = ++self._state.call
-//   const rc = 1 / (2 * Math.PI * cutoff)
-
-//   if (self._state.n < 0) {
-//     return 0
-//   }
-
-//   if (!self._state.fs[k]) {
-//     const dt = self._state.n
-
-//     self._state.fs[k] = {
-//       last_value: input * (dt / (rc + dt)),
-//       last_x: x,
-//     }
-//     return self._state.fs[k].last_value
-//   }
-
-//   const state = self._state.fs[k]
-//   const dt = x - state.last_x
-//   state.last_x = 0
-//   const alpha = dt / (rc + dt)
-
-//   return (state.last_value =
-//     state.last_value + alpha * (input - state.last_value))
-// }
-
-// self.highpass = (x, input, cutoff) => {
-//   const k = ++self._state.call
-//   const rc = 1 / (2 * Math.PI * cutoff)
-
-//   if (self._state.n < 0) {
-//     return 0
-//   }
-
-//   if (!self._state.fs[k]) {
-//     self._state.fs[k] = {
-//       last_value: input,
-//       last_input: input,
-//       last_x: 0,
-//     }
-//     return self._state.fs[k].last_value
-//   }
-//   const state = self._state.fs[k]
-//   const dt = x - state.last_x
-//   state.last_x = x
-//   const alpha = rc / (rc + dt)
-
-//   state.last_value = alpha * (state.last_value + input - state.last_input)
-//   state.last_input = input
-//   return state.last_value
-// }
 
 self.pulse = () => {
   const k = ++self._state.call
@@ -325,19 +278,19 @@ self.pulse = () => {
   return 0
 }
 
-self.peak = (t, freq, a = 1) => {
+self.peak = (t, freq, amplitude = 1) => {
   const k = ++self._state.call
 
   if (t >= freq && !self._state.fs[k]) {
     self._state.fs[k] = true
-    return a
+    return amplitude
   }
   return 0
 }
 
-self.band = (t, freqMin, freqMax, a = 1) => {
+self.band = (t, freqMin, freqMax, amplitude = 1) => {
   if (t > freqMin && t < freqMax) {
-    return a
+    return amplitude
   }
   return 0
 }
@@ -1260,28 +1213,13 @@ onmessage = ({
         if (type === 'list') {
           notablePoints = plotters[0]().map(([x, y]) => [x || 0, y || 0])
           if (notablePoints.length > 1) {
-            if (interpolation === 'cubic') {
-              points = cubicInterpolation(
-                notablePoints,
-                samples / notablePoints.length
-              )
-            } else if (interpolation === 'quadratic') {
-              points = quadraticInterpolation(
-                notablePoints,
-                samples / notablePoints.length
-              )
-            } else if (interpolation === 'lagrange') {
-              points = lagrangeInterpolation(
-                notablePoints,
-                samples / notablePoints.length
-              )
-            } else if (interpolation === 'trigonometric') {
-              points = trigonometricInterpolation(
-                notablePoints,
-                samples / notablePoints.length
-              )
-            } else if (interpolation === 'linear') {
+            if (interpolation === 'linear') {
               points = notablePoints.flat()
+            } else {
+              points = interpolate(interpolation)(
+                notablePoints,
+                samples / notablePoints.length
+              )
             }
           }
           notablePoints = notablePoints.flat()

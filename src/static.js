@@ -7,3 +7,17 @@ export const INTERPOLATIONS = [
   'trigonometric',
   'linear',
 ]
+export const OSCILLATIONS = [
+  'sine',
+  'expsine',
+  'square',
+  'smoothsquare',
+  'sawtooth',
+  'triangle',
+  'noise',
+  'spiky',
+  'shark',
+  'squarecircle',
+  'circle',
+  'wave',
+]
