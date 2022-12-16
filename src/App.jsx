@@ -1,5 +1,6 @@
 import { autocompletion } from '@codemirror/autocomplete'
-import { tooltips } from '@codemirror/view'
+import { tooltips, keymap } from '@codemirror/view'
+import { Prec } from '@codemirror/state'
 import { javascript } from '@codemirror/lang-javascript'
 import { tags as t } from '@lezer/highlight'
 import { createTheme } from '@uiw/codemirror-themes'
@@ -23,6 +24,7 @@ import { Spectrogram } from './Spectrogram'
 import themes from './themes'
 import { DEFAULT_SAMPLE_RATE } from './base'
 import { regionEquals } from './utils'
+import { acceptCompletion } from '@codemirror/autocomplete'
 
 const qsOptions = { ignoreQueryPrefix: true, addQueryPrefix: true }
 
@@ -146,7 +148,7 @@ function urlMiddleware(reducer) {
   }
 }
 function plotCompletions(context) {
-  let word = context.matchBefore(/[\w@]*/)
+  let word = context.matchBefore(/[\w@$/]*/)
   if (word.from === word.to && !context.explicit) return null
   return {
     from: word.from,
@@ -193,6 +195,7 @@ export function App() {
 
   const handleFunctions = useCallback(
     async functions => {
+      console.log('handleFunctions', functions)
       setFunctionsText(functions)
 
       const data = await plotFunctions(
@@ -243,8 +246,8 @@ export function App() {
       setAudio(data.some(({ type }) => type === 'sound'))
       if (functions !== state.functions) {
         dispatch({ type: 'functions', functions })
-        setErrors([])
       }
+      setErrors([])
     },
     [currentPreferredRegion, recordings, state.functions, state.region]
   )
@@ -589,6 +592,17 @@ export function App() {
               javascript({ jsx: true }),
               autocompletion({ override: [plotCompletions] }),
               tooltips({ parent: document.body }),
+              Prec.highest(
+                keymap.of([
+                  {
+                    key: 'Tab',
+                    run: view => {
+                      acceptCompletion(view)
+                      return true
+                    },
+                  },
+                ])
+              ),
             ]}
             onChange={handleFunctions}
           />

@@ -34,6 +34,7 @@ const sendToPlotter = async (index, message, type) => {
     try {
       value = await Promise.race([promises[index], timeout(40)])
     } catch (e) {
+      promises[index] = null
       if (e !== 'CANCEL') {
         throw e
       }
@@ -50,19 +51,29 @@ const sendToPlotter = async (index, message, type) => {
     let rej = null
     promises[index] = new Promise((resolve, reject) => {
       rej = reject
+      const handleError = event => {
+        reject(
+          new Error(
+            `Error in plotter ${event.message} (${event.filename}:${event.lineno})`
+          )
+        )
+      }
       const filterMessage = ({ data }) => {
         if (data.uuid === uuid) {
           promises[index] = null
           resolve(data)
           plotter.removeEventListener('message', filterMessage)
+          plotter.removeEventListener('error', handleError)
         }
       }
       plotter.addEventListener('message', filterMessage)
+      plotter.addEventListener('error', handleError)
     })
     promises[index].reject = rej
     const data = await promises[index]
     return data
   } catch (e) {
+    promises[index] = null
     if (e !== 'CANCEL') {
       throw e
     }

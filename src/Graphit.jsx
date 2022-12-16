@@ -205,66 +205,77 @@ export const Graphit = memo(
       redraw()
 
       for (let i = 0; i < data.length; i++) {
-        const { index, values, mode, type, err } = data[i]
+        const { index, values, notablePoints, mode, type, err } = data[i]
         if (err) {
           errors.push(err)
           continue
         }
+        const renders = {}
+        if (notablePoints.length) {
+          renders['cross'] = notablePoints
+        }
+        if (values.length) {
+          renders[mode] = values
+        }
         ctx.fillStyle = ctx.strokeStyle = theme.colors[index] + 'bb'
         // ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
-        ctx.beginPath()
-        let line = false,
-          block = false
-        for (let n = 0; n < values.length; n += 2) {
-          if (isNaN(values[n]) || isNaN(values[n + 1])) {
-            if (
-              ['linear', 'linear-horizontal'].includes(type) &&
-              isNaN(values[n]) &&
-              isNaN(values[n + 1])
-            ) {
-              if (block) {
-                ctx.closePath()
-                ctx.fill()
-                ctx.beginPath()
-                block = false
-              } else {
-                ctx.stroke()
-                ctx.beginPath()
-                block = true
+        for (let [mode, values] of Object.entries(renders)) {
+          ctx.beginPath()
+          let line = false,
+            block = false
+          for (let n = 0; n < values.length; n += 2) {
+            if (isNaN(values[n]) || isNaN(values[n + 1])) {
+              if (
+                ['linear', 'linear-horizontal'].includes(type) &&
+                isNaN(values[n]) &&
+                isNaN(values[n + 1])
+              ) {
+                if (block) {
+                  ctx.closePath()
+                  ctx.fill()
+                  ctx.beginPath()
+                  block = false
+                } else {
+                  ctx.stroke()
+                  ctx.beginPath()
+                  block = true
+                }
               }
+              line = false
+              continue
             }
-            line = false
-            continue
-          }
-          const i = clamp(x2i(values[n]), -(2 ** 31), 2 ** 31)
-          const j = clamp(y2j(values[n + 1]), -(2 ** 31), 2 ** 31)
+            const i = clamp(x2i(values[n]), -(2 ** 31), 2 ** 31)
+            const j = clamp(y2j(values[n + 1]), -(2 ** 31), 2 ** 31)
 
-          if (mode === 'line') {
-            if (line) {
-              ctx.lineTo(i, j)
-            } else {
+            if (mode === 'line') {
+              if (line) {
+                ctx.lineTo(i, j)
+              } else {
+                ctx.moveTo(i, j)
+              }
+            } else if (mode === 'dot') {
+              ctx.fillRect(
+                i - lineWidth / 2,
+                j - lineWidth / 2,
+                lineWidth,
+                lineWidth
+              )
+            } else if (mode === 'point') {
               ctx.moveTo(i, j)
+              ctx.arc(i, j, lineWidth * 2, 0, TAU)
+            } else if (mode === 'cross') {
+              ctx.moveTo(i, j - lineWidth * 4)
+              ctx.lineTo(i, j + lineWidth * 4)
+              ctx.moveTo(i - lineWidth * 4, j)
+              ctx.lineTo(i + lineWidth * 4, j)
             }
+            line = true
           }
-          if (mode === 'dot') {
-            ctx.fillRect(
-              i - lineWidth / 2,
-              j - lineWidth / 2,
-              lineWidth,
-              lineWidth
-            )
+          if (['line', 'cross'].includes(mode)) {
+            ctx.stroke()
+          } else if (['dot', 'point'].includes(mode)) {
+            ctx.fill()
           }
-          if (mode === 'point') {
-            ctx.moveTo(i, j)
-            ctx.arc(i, j, lineWidth, 0, TAU)
-          }
-          line = true
-        }
-        if (mode === 'line') {
-          ctx.stroke()
-        }
-        if (['dot', 'point'].includes(mode)) {
-          ctx.fill()
         }
       }
       console.warn(...errors)

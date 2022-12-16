@@ -1,4 +1,5 @@
 import { DEFAULT_SAMPLE_RATE } from './base'
+import { MODES, RENDERINGS, INTERPOLATIONS } from './static'
 export function lerp(v0, v1, t) {
   return (1 - t) * v0 + t * v1
 }
@@ -57,24 +58,37 @@ export function getFunctionParams(fun, region) {
     max = null,
     samples = null,
     rendering = null,
-    mode = 'line'
+    mode = null,
+    interpolation = null
+
   if ((match = fun.match(/(.+)@@.+$/))) {
     fun = match[1]
-  }
-  if ((match = fun.match(/(.+)@\/\s*([^@]+)(@.+|$)/))) {
-    fun = match[1] + (match[3] || '')
-    mode = match[2].trim()
   }
   if ((match = fun.match(/(.+)@!\s*([^@]+)(@.+|$)/))) {
     fun = match[1] + (match[3] || '')
     samples = match[2].trim()
   }
   if (
-    (match = fun.match(/(.+)@\s*(auto|size|adaptative|fft|ifft)\s*(@.+|$)/))
+    (match = fun.match(new RegExp(`(.+)@\\/\\s*(${MODES.join('|')})(@.+|$)`)))
+  ) {
+    fun = match[1] + (match[3] || '')
+    mode = match[2].trim()
+  }
+  if (
+    (match = fun.match(
+      new RegExp(`(.+)@\\$\\s*(${INTERPOLATIONS.join('|')})(@.+|$)`)
+    ))
+  ) {
+    fun = match[1] + (match[3] || '')
+    interpolation = match[2].trim()
+  }
+  if (
+    (match = fun.match(new RegExp(`(.+)@\\s*(${RENDERINGS.join('|')})(@.+|$)`)))
   ) {
     fun = match[1] + (match[3] || '')
     rendering = match[2].trim()
   }
+
   if ((match = fun.match(/(.+)@(.+)->([^@]+)(@.+|$)/))) {
     fun = match[1] + (match[4] || '')
     min = match[2].trim()
@@ -140,6 +154,14 @@ export function getFunctionParams(fun, region) {
       ;[min, max] = [0, 1]
     }
     samples = samples || (region ? Math.min(region[0][2], region[1][2]) : 0)
+  } else if ((match = fun.match(/^\s*\[\]\s*=\s*(.+)\s*$/))) {
+    type = 'list'
+    rendering = rendering || 'cubic'
+    funs = [`[${match[1].trim()}]`]
+    if (min === null) {
+      ;[[min, max]] = region || [[]]
+    }
+    samples = samples || (region ? region[0][2] : 0)
   } else if ((match = fun.match(/^\s*(\S+)\s*=(.+)$/))) {
     type = 'affect'
     funs = [match[1].trim(), match[2].trim()]
@@ -157,6 +179,181 @@ export function getFunctionParams(fun, region) {
     samples,
     mode,
     rendering,
+    interpolation,
     recIndexes,
   }
+}
+
+export const cubicInterpolation = (points, precision) => {
+  const n = ~~(points.length - 1)
+  const x = new Array(n + 1)
+  const a = new Array(n + 1)
+  const b = new Array(n + 1).fill(0)
+  const c = new Array(n + 1).fill(0)
+  const d = new Array(n + 1).fill(0)
+  const m = new Array(n + 1).fill(0)
+  const z = new Array(n + 1).fill(0)
+  const h = new Array(n)
+  const k = new Array(n)
+  const g = new Array(n)
+
+  for (let i = 0; i < n + 1; i++) {
+    x[i] = points[i][0]
+    a[i] = points[i][1]
+  }
+
+  for (let i = 0; i < n; i++) {
+    h[i] = x[i + 1] - x[i]
+    k[i] = a[i + 1] - a[i]
+    g[i] = h[i] !== 0 ? k[i] / h[i] : 1
+  }
+
+  for (let i = 1; i < n; i++) {
+    const l =
+      x[i + 1] - x[i - 1] !== 0
+        ? 1 / (2 * (x[i + 1] - x[i - 1]) - h[i - 1] * m[i - 1])
+        : 0
+    m[i] = h[i] * l
+    z[i] = (3 * (g[i] - g[i - 1]) - h[i - 1] * z[i - 1]) * l
+  }
+  for (let j = n - 1; j >= 0; j--) {
+    if (h[j] === 0) {
+      continue
+    }
+    c[j] = z[j] - m[j] * c[j + 1]
+    b[j] = g[j] - (h[j] * (c[j + 1] + 2 * c[j])) / 3
+    d[j] = (c[j + 1] - c[j]) / (3 * h[j])
+  }
+  const result = []
+
+  for (let i = 0; i < n + 1; i++) {
+    result.push(x[i], a[i])
+    if (i === n || h[i] === 0) {
+      continue
+    }
+    for (let j = 1; j < precision; j++) {
+      const t = (j * h[i]) / precision
+      result.push(x[i] + t, a[i] + t * (b[i] + t * (c[i] + t * d[i])))
+    }
+  }
+  return result
+}
+
+export const quadraticInterpolation = (points, precision) => {
+  const n = ~~(points.length - 1)
+  const x = new Array(n + 1)
+  const a = new Array(n + 1)
+  const b = new Array(n + 1).fill(0)
+  const c = new Array(n + 1).fill(0)
+  const h = new Array(n)
+  const k = new Array(n)
+  const g = new Array(n)
+
+  for (let i = 0; i < n + 1; i++) {
+    x[i] = points[i][0]
+    a[i] = points[i][1]
+  }
+
+  for (let i = 0; i < n; i++) {
+    h[i] = x[i + 1] - x[i]
+    k[i] = a[i + 1] - a[i]
+    g[i] = h[i] !== 0 ? k[i] / h[i] : 1
+  }
+
+  for (let i = 1; i < n; i++) {
+    b[i] = 2 * g[i - 1] - b[i - 1]
+  }
+  for (let i = 0; i < n; i++) {
+    c[i] = h[i] !== 0 ? (g[i] - b[i]) / h[i] : 0
+  }
+  const result = []
+  for (let i = 0; i < n + 1; i++) {
+    result.push(x[i], a[i])
+    if (i === n || h[i] === 0) {
+      continue
+    }
+    for (let j = 1; j < precision; j++) {
+      const t = (j * h[i]) / precision
+      result.push(x[i] + t, a[i] + t * (b[i] + t * c[i]))
+    }
+  }
+
+  return result
+}
+
+export const lagrangeInterpolation = (points, precision) => {
+  const n = ~~(points.length - 1)
+  const x = new Array(n + 1)
+  const a = new Array(n + 1)
+  const h = new Array(n)
+  const result = []
+
+  for (let i = 0; i < n + 1; i++) {
+    x[i] = points[i][0]
+    a[i] = points[i][1]
+  }
+  for (let i = 0; i < n; i++) {
+    h[i] = x[i + 1] - x[i]
+  }
+
+  for (let i = 0; i < n + 1; i++) {
+    result.push(x[i], a[i])
+    if (i === n || h[i] === 0) {
+      continue
+    }
+    for (let j = 1; j < precision; j++) {
+      const t = x[i] + (j * h[i]) / precision
+      let sum = 0
+      for (let k = 0; k < n + 1; k++) {
+        let prod = 1
+        for (let l = 0; l < n + 1; l++) {
+          if (k !== l && x[k] !== x[l]) {
+            prod *= (t - x[l]) / (x[k] - x[l])
+          }
+        }
+        sum += a[k] * prod
+      }
+      result.push(t, sum)
+    }
+  }
+  return result
+}
+
+export const trigonometricInterpolation = (points, precision) => {
+  const n = ~~(points.length - 1)
+  const x = new Array(n + 1)
+  const a = new Array(n + 1)
+  const h = new Array(n)
+  const result = []
+
+  for (let i = 0; i < n + 1; i++) {
+    x[i] = points[i][0]
+    a[i] = points[i][1]
+  }
+
+  for (let i = 0; i < n; i++) {
+    h[i] = x[i + 1] - x[i]
+  }
+
+  for (let i = 0; i < n + 1; i++) {
+    result.push(x[i], a[i])
+    if (i === n || h[i] === 0) {
+      continue
+    }
+    for (let j = 1; j < precision; j++) {
+      const t = x[i] + (j * h[i]) / precision
+      let sum = 0
+      for (let k = 0; k < n + 1; k++) {
+        let prod = 1
+        for (let l = 0; l < n + 1; l++) {
+          if (k !== l && Math.sin(0.5 * (x[k] - x[l]) !== 0)) {
+            prod *= Math.sin(0.5 * (t - x[l])) / Math.sin(0.5 * (x[k] - x[l]))
+          }
+        }
+        sum += a[k] * prod
+      }
+      result.push(t, sum)
+    }
+  }
+  return result
 }

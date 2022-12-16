@@ -1,8 +1,15 @@
 /* eslint-disable no-new-func */
 
 import doc from './doc'
-import { nextPowerOf2 } from './utils'
+import {
+  nextPowerOf2,
+  cubicInterpolation,
+  quadraticInterpolation,
+  lagrangeInterpolation,
+  trigonometricInterpolation,
+} from './utils'
 import * as easings from './easings'
+import { MODES } from './static'
 
 /* eslint-disable no-restricted-globals */
 const TYPE_VARIABLES = {
@@ -12,6 +19,7 @@ const TYPE_VARIABLES = {
   parametric: 't',
   sound: 't',
   fft: 't',
+  list: '',
 }
 self.lerp = (a, b, x) => a + (b - a) * x
 self.clamp = (x, a, b) => Math.min(Math.max(x, a), b)
@@ -1074,7 +1082,6 @@ const evalPoint = (plotters, type, n) => {
   }
 }
 
-const modes = ['line', 'dot', 'point']
 const affected = {}
 onmessage = ({
   data: {
@@ -1088,6 +1095,7 @@ onmessage = ({
     samples,
     mode,
     rendering,
+    interpolation,
     recs,
     job,
     uuid,
@@ -1096,14 +1104,18 @@ onmessage = ({
   let err = '',
     points = [],
     preferredRegion,
-    values
+    values,
+    notablePoints = []
   try {
     if (type === 'unknown') {
       throw new Error(`Invalid function type ${funs.join(', ')}`)
     }
-    if (!modes.includes(mode)) {
+    if (mode === null) {
+      mode = 'line'
+    }
+    if (!MODES.includes(mode)) {
       throw new Error(
-        `Invalid mode: ${mode}, must be one of ${modes.join(', ')}`
+        `Invalid mode: ${mode}, must be one of ${MODES.join(', ')}`
       )
     }
     if (typeof min === 'string') {
@@ -1169,9 +1181,11 @@ onmessage = ({
     if (job === 'check') {
       self._state.call = self._state.n = 0
       const val = plotters[0](Math.random() * (max - min) + min)
-      if (typeof val !== 'number') {
+      if (type === 'list' ? !Array.isArray(val) : typeof val !== 'number') {
         let e
-        if (typeof val === 'function') {
+        if (typeof val === 'number') {
+          e = new Error(`Invalid list (${val})`)
+        } else if (typeof val === 'function') {
           e = new Error(self.__doc__[val] || 'Function not supported')
         } else if (typeof val === 'undefined') {
           e = new Error(`${funs[0]} is undefined`)
@@ -1243,7 +1257,35 @@ onmessage = ({
           self._state.i = -1
           self._state.fs = []
         }
-        if (rendering === 'size') {
+        if (type === 'list') {
+          notablePoints = plotters[0]().map(([x, y]) => [x || 0, y || 0])
+          if (notablePoints.length > 1) {
+            if (interpolation === 'cubic') {
+              points = cubicInterpolation(
+                notablePoints,
+                samples / notablePoints.length
+              )
+            } else if (interpolation === 'quadratic') {
+              points = quadraticInterpolation(
+                notablePoints,
+                samples / notablePoints.length
+              )
+            } else if (interpolation === 'lagrange') {
+              points = lagrangeInterpolation(
+                notablePoints,
+                samples / notablePoints.length
+              )
+            } else if (interpolation === 'trigonometric') {
+              points = trigonometricInterpolation(
+                notablePoints,
+                samples / notablePoints.length
+              )
+            } else if (interpolation === 'linear') {
+              points = notablePoints.flat()
+            }
+          }
+          notablePoints = notablePoints.flat()
+        } else if (rendering === 'size') {
           points = sizePlot(plotters, type, region, min, max, samples)
         } else if (rendering === 'adaptative') {
           points = adaptativePlot(plotters, type, region, min, max, samples)
@@ -1282,7 +1324,9 @@ onmessage = ({
       max,
       samples,
       rendering,
+      interpolation,
       preferredRegion,
+      notablePoints,
       err,
       uuid,
     },
