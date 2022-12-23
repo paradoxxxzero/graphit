@@ -33,7 +33,6 @@ const initialState = {
   lineWidth: 1.5,
   volume: 0.5,
   region: null,
-  loop: false,
   functions:
     'y = sin(pow(x, 4))/x ; x = cos(pow(2, sin(y**2))) \nr = .1 * (exp(sin(o)) - 2 * cos(4*o) + sin(o/12)) @ 0 -> 24*pi @! pi*1000 \nk = .75; { x = k*cos(3*t), y = k*sin(2*t) } @ 0 -> 2*pi @! 1000',
 }
@@ -43,7 +42,6 @@ const initialType = {
   lineWidth: 'float',
   volume: 'float',
   region: 'region',
-  loop: 'bool',
   functions: 'string',
 }
 
@@ -106,9 +104,6 @@ function reducer(state, action) {
       } else {
         return state
       }
-
-    case 'loop':
-      return { ...state, loop: action.loop }
     default:
       throw new Error("Unknown action type: '" + action.type + "'")
   }
@@ -567,7 +562,6 @@ export function App() {
             functions={state.functions}
             theme={theme}
             volume={state.volume}
-            loop={state.loop}
             recordings={recordings}
             setPlayAudio={handleSetPlayAudio}
             setRecordAudio={handleSetRecordAudio}
@@ -692,17 +686,6 @@ export function App() {
                   value={state.volume}
                   onChange={e =>
                     dispatch({ type: 'volume', volume: e.target.value })
-                  }
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="loop">Loop</label>
-                <input
-                  type="checkbox"
-                  name="loop"
-                  checked={state.loop}
-                  onChange={e =>
-                    dispatch({ type: 'loop', loop: e.target.checked })
                   }
                 />
               </div>

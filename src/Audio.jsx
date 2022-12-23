@@ -6,7 +6,6 @@ import recordProcessor from './recording.worklet?url'
 export const Audio = ({
   functions,
   volume,
-  loop,
   recordings,
   setPlayAudio,
   setRecordAudio,
@@ -59,7 +58,6 @@ export const Audio = ({
 
         const source = ctx.createBufferSource()
         source.buffer = buffer
-        source.loop = loop
         const spectrogram = []
 
         const analyser = ctx.createAnalyser()
@@ -170,7 +168,6 @@ export const Audio = ({
       audioContext,
       createContext,
       functions,
-      loop,
       masterGain,
       recordings,
       setSpectrograms,
