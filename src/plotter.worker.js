@@ -1268,6 +1268,6 @@ onmessage = ({
       err,
       uuid,
     },
-    values?.buffer
+    values ? [values.buffer] : null
   )
 }
